@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import { initDb } from './db';
 import collectionRoutes from './routes/collection';
 import poisRoutes from './routes/pois';
 import exportRoutes from './routes/export';
@@ -30,6 +31,8 @@ if (hasClient) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}${hasClient ? '' : ' (API only)'}`);
+initDb().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}${hasClient ? '' : ' (API only)'}`);
+  });
 });

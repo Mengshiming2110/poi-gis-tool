@@ -1,11 +1,46 @@
 {
   "name": "poi-gis-tool",
+  "version": "1.0.0",
+  "description": "POI数据采集与GIS可视化工具",
+  "author": "POI GIS Tool",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",
     "build": "cd client && npm run build && cd ../server && npm run build",
     "start": "cd server && node dist/index.js",
+    "electron:dev": "npm run build && electron .",
+    "electron:build": "npm run build && electron-builder --win portable",
+    "postinstall": "electron-builder install-app-deps",
     "install:all": "cd server && npm install && cd ../client && npm install"
+  },
+  "build": {
+    "appId": "com.poi-gis.tool",
+    "productName": "POI数据采集工具",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "server/dist/**/*",
+      "server/node_modules/**/*",
+      "client/dist/**/*",
+      "server/data"
+    ],
+    "extraResources": [
+      {
+        "from": "server/data",
+        "to": "server/data"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "icon": null
+    }
+  },
+  "devDependencies": {
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.3"
   }
 }

@@ -7,17 +7,17 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0",
     "cors": "^2.8.5",
     "exceljs": "^4.4.0",
     "express": "^4.21.0",
+    "sql.js": "^1.14.1",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/geojson": "^7946.0.16",
+    "@types/sql.js": "^1.4.11",
     "@types/uuid": "^10.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0"
