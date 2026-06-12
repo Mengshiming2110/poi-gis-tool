@@ -25,11 +25,15 @@ export async function searchPoiInCell(
   });
 
   const url = `${BASE_URL}?${params}`;
+  console.log(`[Amap] 请求: cell[${cell.row},${cell.col}] page=${page}`);
   const response = await fetch(url);
   if (!response.ok) {
+    console.error(`[Amap] HTTP ${response.status}: ${url}`);
     throw new Error(`Amap API HTTP error: ${response.status}`);
   }
-  return response.json() as Promise<AmapSearchResponse>;
+  const json = await response.json() as AmapSearchResponse;
+  console.log(`[Amap] 响应: status=${json.status} count=${json.count} pois=${json.pois?.length || 0} info=${json.info}`);
+  return json;
 }
 
 export async function collectCellPois(

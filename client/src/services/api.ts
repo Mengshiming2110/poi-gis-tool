@@ -3,13 +3,19 @@ import type { CollectRequest, CollectResponse, Task, PoiQueryResult } from '../t
 const BASE = '/api';
 
 export async function startCollection(req: CollectRequest): Promise<CollectResponse> {
+  console.log('[Client] 发送采集请求:', JSON.stringify(req, null, 2));
   const res = await fetch(`${BASE}/collect`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
   });
-  if (!res.ok) throw new Error('采集请求失败');
-  return res.json();
+  const json = await res.json();
+  if (!res.ok) {
+    console.error('[Client] 采集请求失败:', json);
+    throw new Error('采集请求失败');
+  }
+  console.log('[Client] 采集任务已创建:', json);
+  return json;
 }
 
 export async function getTaskStatus(taskId: string): Promise<Task> {

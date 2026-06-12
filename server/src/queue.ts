@@ -53,6 +53,8 @@ export function startCollection(
     cells = filterCellsByPolygon(cells, req.region);
   }
 
+  console.log(`[Queue] 开始采集: taskId=${taskId} mode=${req.mode} categories=${req.categories.join(',')} cells=${cells.length}`);
+
   createTask({
     id: taskId,
     mode: req.mode,
@@ -90,16 +92,19 @@ async function processNextCell(taskId: string): Promise<void> {
   if (!task || task.status !== 'running') return;
 
   if (task.currentIndex >= task.cells.length) {
+    const t = getTask(taskId);
+    console.log(`[Queue] 采集完成: taskId=${taskId} totalPois=${t?.total_pois || 0}`);
     updateTaskStatus(taskId, 'done');
     task.status = 'done';
-    const t = getTask(taskId);
     task.onComplete({ taskId, totalPois: t?.total_pois || 0 });
     activeTasks.delete(taskId);
     return;
   }
 
   const cell = task.cells[task.currentIndex];
+  console.log(`[Queue] 处理格子 ${task.currentIndex + 1}/${task.cells.length} [${cell.row},${cell.col}]`);
   const pois: AmapPoiItem[] = await collectCellWithRetry(cell, task.categories);
+  console.log(`[Queue] 格子 ${task.currentIndex + 1} 返回 ${pois.length} 条POI`);
 
   if (pois.length > 0) {
     insertPois(taskId, pois.map(p => {

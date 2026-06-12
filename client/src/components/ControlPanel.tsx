@@ -68,6 +68,7 @@ function ControlPanel(props: ControlPanelProps) {
         estimatedMinutes={props.estimatedMinutes}
         drawnShape={props.drawnShape}
         gridCells={props.gridCells}
+        categoriesCount={props.selectedCategories.length}
         onModeChange={props.onModeChange}
         onGridSizeChange={props.onGridSizeChange}
         onGridSizeMetersChange={props.onGridSizeMetersChange}

@@ -10,6 +10,7 @@ interface CollectionModeProps {
   estimatedMinutes: number;
   drawnShape: DrawnShape | null;
   gridCells: GridCell[];
+  categoriesCount: number;
   onModeChange: (mode: TaskMode) => void;
   onGridSizeChange: (size: number) => void;
   onGridSizeMetersChange: (meters: number) => void;
@@ -20,7 +21,7 @@ interface CollectionModeProps {
 
 function CollectionMode({
   mode, gridSize, gridSizeMeters, estimatedCells, estimatedMinutes,
-  drawnShape, gridCells,
+  drawnShape, gridCells, categoriesCount,
   onModeChange, onGridSizeChange, onGridSizeMetersChange,
   onSplitGrid, onStart, disabled,
 }: CollectionModeProps) {
@@ -106,6 +107,11 @@ function CollectionMode({
           <button type="button" onClick={onStart} disabled={disabled} style={startBtnStyle}>
             <Play size={16} weight="fill" /> 开始采集
           </button>
+          {disabled && categoriesCount === 0 && (
+            <div style={{ fontSize: 10, color: '#ef4444', marginTop: 4, textAlign: 'center' }}>
+              请先选择 POI 类别
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -147,6 +153,14 @@ function CollectionMode({
           <button type="button" onClick={onStart} disabled={disabled} style={startBtnStyle}>
             <Play size={16} weight="fill" /> 开始采集
           </button>
+          {disabled && (
+            <div style={{ fontSize: 10, color: '#ef4444', marginTop: 4, textAlign: 'center' }}>
+              {categoriesCount === 0 ? '请先选择 POI 类别'
+                : !drawnShape ? '请先在地图上绘制区域'
+                : gridCells.length === 0 ? '请先执行网格切分'
+                : ''}
+            </div>
+          )}
         </>
       )}
     </div>
