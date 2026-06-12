@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Pause, Play, Stop, Download, Clock, MapPin, CaretUp, CaretDown } from '@phosphor-icons/react';
+import { Pause, Play, Stop, Download, Clock, MapPin, CaretUp, CaretDown, ArrowsOut } from '@phosphor-icons/react';
+import DataTable from './DataTable';
 import type { ProgressData, TaskStatus } from '../types/poi';
 
 interface ProgressDrawerProps {
@@ -34,12 +35,23 @@ function ProgressDrawer({ status, progress, totalPois, taskId, onPause, onResume
     document.addEventListener('mouseup', onUp);
   }, [drawerHeight]);
 
+  const handleSnap = useCallback(() => {
+    setExpanded(true);
+    setDrawerHeight(40);
+  }, []);
+
   if (status === 'pending' || status === 'cancelled') return null;
 
   const btnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', gap: 4,
     padding: '4px 10px', borderRadius: 4, border: '1px solid #e2e8f0',
     background: '#fff', fontSize: 11, cursor: 'pointer', color: '#475569',
+  };
+
+  const iconBtnStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8',
+    padding: 2,
   };
 
   const statusLabel = status === 'running' ? '采集中' : status === 'paused' ? '已暂停' : '已完成';
@@ -69,11 +81,17 @@ function ProgressDrawer({ status, progress, totalPois, taskId, onPause, onResume
               {statusLabel}
             </span>
           </div>
-          <button type="button" onClick={() => setExpanded(!expanded)}
-            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 2, fontSize: 11 }}>
-            {expanded ? <CaretDown size={14} /> : <CaretUp size={14} />}
-            {expanded ? '收起' : '展开数据'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button type="button" onClick={handleSnap} title="展开至40vh"
+              style={iconBtnStyle}>
+              <ArrowsOut size={14} />
+            </button>
+            <button type="button" onClick={() => setExpanded(!expanded)}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 2, fontSize: 11 }}>
+              {expanded ? <CaretDown size={14} /> : <CaretUp size={14} />}
+              {expanded ? '收起' : '展开数据'}
+            </button>
+          </div>
         </div>
 
         {/* Progress bar */}
@@ -110,6 +128,13 @@ function ProgressDrawer({ status, progress, totalPois, taskId, onPause, onResume
             </>
           )}
         </div>
+
+        {/* DataTable — visible only when expanded */}
+        {expanded && taskId && (
+          <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 8, paddingTop: 4 }}>
+            <DataTable taskId={taskId} />
+          </div>
+        )}
       </div>
     </div>
   );

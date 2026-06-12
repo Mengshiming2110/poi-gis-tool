@@ -1,13 +1,14 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import MapView from './components/MapView';
 import ControlPanel from './components/ControlPanel';
 import DrawToolbar from './components/DrawToolbar';
 import ProgressDrawer from './components/ProgressDrawer';
-import DataTable from './components/DataTable';
+import SettingsDialog from './components/SettingsDialog';
 import { useCollection } from './hooks/useCollection';
 import { useSSE } from './hooks/useSSE';
 import { getExportUrl } from './services/api';
 import type { TaskMode } from './types/poi';
+import type { DrawAPI } from './components/MapView';
 import './App.css';
 
 function App() {
@@ -15,6 +16,9 @@ function App() {
   const [mode, setMode] = useState<TaskMode>('grid');
   const [gridSize, setGridSize] = useState(0.01);
   const [drawMode, setDrawMode] = useState<'polygon' | 'rectangle' | 'circle' | null>(null);
+
+  const drawAPIRef = useRef<DrawAPI | null>(null);
+  const getBoundsRef = useRef<(() => any) | null>(null);
 
   const collection = useCollection();
 
@@ -30,15 +34,32 @@ function App() {
 
   const disabled = selectedCategories.length === 0 || collection.status === 'running';
 
+  const handleDrawReady = useCallback((api: DrawAPI) => {
+    drawAPIRef.current = api;
+  }, []);
+
+  const handleMapReady = useCallback((getBounds: () => any) => {
+    getBoundsRef.current = getBounds;
+  }, []);
+
   const handleStart = useCallback(() => {
-    const defaultBounds = {
+    const bounds = getBoundsRef.current?.() || {
       southwest: { lng: 116.3, lat: 39.8 },
       northeast: { lng: 116.5, lat: 40.0 },
     };
+
+    if (mode === 'region') {
+      const region = drawAPIRef.current?.getDrawnRegion();
+      if (!region) {
+        alert('请先在地图上绘制区域');
+        return;
+      }
+    }
+
     collection.start({
       mode,
       categories: selectedCategories,
-      bounds: defaultBounds,
+      bounds,
       gridSize: mode === 'grid' ? gridSize : undefined,
     });
   }, [mode, selectedCategories, gridSize, collection]);
@@ -50,7 +71,7 @@ function App() {
 
   return (
     <>
-      <MapView>
+      <MapView onDrawReady={handleDrawReady} onMapReady={handleMapReady}>
         <ControlPanel
           selectedCategories={selectedCategories}
           onCategoriesChange={setSelectedCategories}
@@ -65,8 +86,15 @@ function App() {
         />
 
         {mode === 'region' && (
-          <DrawToolbar activeMode={drawMode} onModeChange={setDrawMode} onClear={() => setDrawMode(null)} />
+          <DrawToolbar
+            activeMode={drawMode}
+            onModeChange={setDrawMode}
+            onClear={() => setDrawMode(null)}
+            drawAPI={drawAPIRef.current}
+          />
         )}
+
+        <SettingsDialog />
 
         <ProgressDrawer
           status={collection.status}
@@ -78,16 +106,6 @@ function App() {
           onCancel={collection.cancel}
           onExport={handleExport}
         />
-
-        {collection.taskId && (
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 9,
-            background: '#fff', padding: '0 16px', borderRadius: '10px 10px 0 0',
-            boxShadow: '0 -2px 12px rgba(0,0,0,0.08)', maxHeight: '40vh', overflowY: 'auto',
-          }}>
-            <DataTable taskId={collection.taskId} />
-          </div>
-        )}
       </MapView>
     </>
   );

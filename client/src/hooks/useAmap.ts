@@ -1,27 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import AMapLoader from '@amap/amap-jsapi-loader';
 
-const AMAP_KEY = '35f0e1144644fbfba405c109db466cdc';
-const AMAP_SECURITY_CODE = '8d13a7d3f6ecff69f02dc1dea5855b0a';
-const AMAP_VERSION = '2.0';
+function getConfig() {
+  return {
+    key: localStorage.getItem('amap_js_key') || '35f0e1144644fbfba405c109db466cdc',
+    securityCode: localStorage.getItem('amap_security_code') || '8d13a7d3f6ecff69f02dc1dea5855b0a',
+  };
+}
 
-// 高德 JS API 2.0 安全密钥配置
 window._AMapSecurityConfig = {
-  securityJsCode: AMAP_SECURITY_CODE,
+  securityJsCode: getConfig().securityCode,
 };
 
 export function useAmap(containerId: string) {
   const mapRef = useRef<any>(null);
+  const mouseToolRef = useRef<any>(null);
+  const overlaysRef = useRef<any[]>([]);
   const [map, setMap] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let destroyed = false;
+    const { key, securityCode } = getConfig();
 
-    AMapLoader.load({
-      key: AMAP_KEY,
-      version: AMAP_VERSION,
-    })
+    window._AMapSecurityConfig = { securityJsCode: securityCode };
+
+    AMapLoader.load({ key, version: '2.0' })
       .then((AMap: any) => {
         if (destroyed) return;
 
@@ -30,6 +34,11 @@ export function useAmap(containerId: string) {
           center: [116.397428, 39.90923],
           viewMode: '2D',
           resizeEnable: true,
+        });
+
+        // Load MouseTool plugin
+        AMap.plugin('AMap.MouseTool', () => {
+          mouseToolRef.current = new AMap.MouseTool(instance);
         });
 
         mapRef.current = instance;
@@ -49,14 +58,42 @@ export function useAmap(containerId: string) {
     };
   }, [containerId]);
 
-  const getBounds = () => {
-    if (!map) return null;
-    const bounds = map.getBounds();
+  const getBounds = useCallback(() => {
+    if (!mapRef.current) return null;
+    const bounds = mapRef.current.getBounds();
     return {
       southwest: { lng: bounds.getSouthWest().lng, lat: bounds.getSouthWest().lat },
       northeast: { lng: bounds.getNorthEast().lng, lat: bounds.getNorthEast().lat },
     };
-  };
+  }, []);
 
-  return { map, loaded, getBounds };
+  const startDraw = useCallback((type: 'polygon' | 'rectangle' | 'circle', onComplete: (overlay: any) => void) => {
+    const mt = mouseToolRef.current;
+    if (!mt) return;
+    mt.on('draw', (event: any) => {
+      overlaysRef.current.push(event.obj);
+      onComplete(event.obj);
+    });
+    switch (type) {
+      case 'polygon': mt.polygon(); break;
+      case 'rectangle': mt.rectangle(); break;
+      case 'circle': mt.circle(); break;
+    }
+  }, []);
+
+  const stopDraw = useCallback(() => {
+    mouseToolRef.current?.close();
+    mouseToolRef.current?.clearEvents?.('draw');
+  }, []);
+
+  const clearDrawings = useCallback(() => {
+    overlaysRef.current.forEach(o => o.setMap(null));
+    overlaysRef.current = [];
+  }, []);
+
+  const getDrawnRegion = useCallback(() => {
+    return overlaysRef.current.length > 0 ? overlaysRef.current[overlaysRef.current.length - 1] : null;
+  }, []);
+
+  return { map, loaded, getBounds, startDraw, stopDraw, clearDrawings, getDrawnRegion };
 }
