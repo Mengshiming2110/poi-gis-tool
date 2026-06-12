@@ -104,10 +104,14 @@ export function useAmap(containerId: string) {
         setMap(instance);
         setLoaded(true);
 
-        // Auto-locate on first load
+        // Auto-locate on first load (delay for map init)
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
-            (pos) => { instance.setZoomAndCenter(15, [pos.coords.longitude, pos.coords.latitude]); },
+            (pos) => {
+              setTimeout(() => {
+                try { instance.setZoomAndCenter(15, [pos.coords.longitude, pos.coords.latitude]); } catch (e) {}
+              }, 300);
+            },
             () => {},
             { timeout: 5000, enableHighAccuracy: true }
           );
@@ -245,7 +249,7 @@ export function useAmap(containerId: string) {
   const locateMe = useCallback(() => {
     if (!mapRef.current || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (pos) => { mapRef.current.setZoomAndCenter(15, [pos.coords.longitude, pos.coords.latitude]); },
+      (pos) => { try { mapRef.current.setZoomAndCenter(15, [pos.coords.longitude, pos.coords.latitude]); } catch (e) {} },
       () => {},
       { timeout: 5000, enableHighAccuracy: true }
     );
