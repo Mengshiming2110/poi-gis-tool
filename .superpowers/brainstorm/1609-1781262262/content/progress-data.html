@@ -1,0 +1,96 @@
+<h2>进度展示与数据查看</h2>
+<p class="subtitle">采集进行中如何看进度？完成后如何查看和导出数据？</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>底部滑出面板（推荐）</h3>
+      <p>采集开始后，地图底部滑出一个半透明进度条。点击进度条展开为数据表格抽屉，占地图40%高度，可上下拖拽调整。不遮挡地图核心区域。</p>
+      <div class="mockup">
+        <div class="mockup-header">底部抽屉式数据面板</div>
+        <div class="mockup-body">
+          <div style="position:relative;height:240px;background:#e8f0fe;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+            <span style="color:#94a3b8;font-size:13px">🗺️ 地图区域</span>
+            <!-- Bottom progress bar (collapsed) -->
+            <div style="position:absolute;bottom:0;left:0;right:0;background:white;border-radius:10px 10px 0 0;box-shadow:0 -2px 12px rgba(0,0,0,0.08);padding:10px 16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:11px;font-weight:bold;color:#1e293b">📊 采集进度</span>
+                  <span style="background:#22c55e;color:white;padding:1px 6px;border-radius:8px;font-size:8px">采集中</span>
+                </div>
+                <span style="font-size:9px;color:#94a3b8">点击展开详情 ▸</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="flex:1;background:#e2e8f0;border-radius:4px;height:6px">
+                  <div style="background:#3b82f6;height:100%;width:62%;border-radius:4px"></div>
+                </div>
+                <span style="font-size:10px;color:#475569;white-space:nowrap">248/400 格</span>
+              </div>
+              <div style="display:flex;gap:16px;margin-top:4px;font-size:9px;color:#64748b">
+                <span>📍 POI: 1,856</span>
+                <span>⏱ 已用: 4m23s</span>
+                <span>🏁 剩余: ~2m</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:6px">
+                <button class="mock-button" style="font-size:9px;padding:2px 8px">⏸ 暂停</button>
+                <button class="mock-button" style="font-size:9px;padding:2px 8px">📥 导出 Excel</button>
+                <button class="mock-button" style="font-size:9px;padding:2px 8px">📥 导出 GeoJSON</button>
+              </div>
+            </div>
+          </div>
+          <!-- Expanded state hint -->
+          <div style="margin-top:6px;background:#f8fafc;padding:8px;border-radius:6px;text-align:center">
+            <span style="font-size:8px;color:#94a3b8">展开后 → 表格占底部40%，可拖拽调整高度，显示全部POI记录</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>浮窗内进度 + 弹出式数据表</h3>
+      <p>进度条集成在左上角控制浮窗内，数据表格以独立模态框弹出。适合屏幕较小的场景，但操作需要多一步。</p>
+      <div class="mockup">
+        <div class="mockup-header">浮窗内进度 + 独立弹窗</div>
+        <div class="mockup-body" style="display:flex;gap:8px">
+          <div style="flex:1;position:relative;height:200px;background:#e8f0fe;border-radius:8px;display:flex;align-items:center;justify-content:center">
+            <span style="color:#94a3b8;font-size:11px">🗺️ 地图区域</span>
+            <!-- Panel with progress -->
+            <div style="position:absolute;top:10px;left:10px;width:200px;background:white;border-radius:8px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+              <div style="font-size:10px;font-weight:bold;color:#1e293b">🎛️ 采集控制</div>
+              <div style="font-size:8px;color:#64748b;margin-top:4px">类别: 餐饮 · 购物</div>
+              <div style="font-size:8px;color:#64748b">模式: 网格 0.01°</div>
+              <div style="margin-top:6px;background:#e2e8f0;border-radius:3px;height:4px"><div style="background:#3b82f6;height:100%;width:62%;border-radius:3px"></div></div>
+              <div style="display:flex;justify-content:space-between;font-size:8px;color:#94a3b8;margin-top:2px">
+                <span>248/400格</span><span>📍1,856</span>
+              </div>
+              <div style="background:#3b82f6;color:white;padding:3px;border-radius:4px;font-size:8px;text-align:center;margin-top:6px">📊 查看数据</div>
+            </div>
+          </div>
+          <div style="flex:0.8;background:white;border-radius:8px;padding:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12)">
+            <div style="font-size:9px;font-weight:bold;color:#1e293b;margin-bottom:4px">📊 采集数据</div>
+            <div style="font-size:8px;color:#475569;margin-bottom:2px">共 1,856 条 POI</div>
+            <div style="max-height:100px;overflow:hidden">
+              <div style="display:flex;gap:2px;font-size:7px;color:#94a3b8;border-bottom:1px solid #e2e8f0;padding:2px 0">
+                <span style="flex:1">名称</span><span style="flex:0.5">类别</span><span style="flex:0.5">地址</span>
+              </div>
+              <div style="display:flex;gap:2px;font-size:7px;color:#475569;padding:2px 0">
+                <span style="flex:1">星巴克</span><span style="flex:0.5">餐饮</span><span style="flex:0.5">国贸大厦...</span>
+              </div>
+              <div style="display:flex;gap:2px;font-size:7px;color:#475569;padding:2px 0">
+                <span style="flex:1">麦当劳</span><span style="flex:0.5">餐饮</span><span style="flex:0.5">三里屯...</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:4px;margin-top:6px">
+              <button class="mock-button" style="font-size:7px;padding:2px 6px">📥 Excel</button>
+              <button class="mock-button" style="font-size:7px;padding:2px 6px">📥 GeoJSON</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

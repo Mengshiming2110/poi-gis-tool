@@ -1,0 +1,109 @@
+<h2>POI 类别选择器设计</h2>
+<p class="subtitle">高德有20+POI大类（餐饮、购物、生活服务...），如何在紧凑的悬浮面板中高效多选？</p>
+
+<div class="options">
+  <div class="option" data-choice="tags" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>标签云 + 搜索</h3>
+      <p>顶部搜索框实时过滤，下方以标签云形式展示类别。已选中高亮，点击切换。支持"全选/清空"。视觉清爽，20+类别不占地。</p>
+      <div class="mockup">
+        <div class="mockup-header">标签云选择器</div>
+        <div class="mockup-body" style="background:#f8fafc;padding:12px;border-radius:8px">
+          <input class="mock-input" placeholder="🔍 搜索类别..." style="margin-bottom:8px;width:100%">
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
+            <span style="background:#3b82f6;color:white;padding:3px 8px;border-radius:12px;font-size:9px">✓ 餐饮</span>
+            <span style="background:#3b82f6;color:white;padding:3px 8px;border-radius:12px;font-size:9px">✓ 购物</span>
+            <span style="background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:12px;font-size:9px">医疗</span>
+            <span style="background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:12px;font-size:9px">教育</span>
+            <span style="background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:12px;font-size:9px">交通</span>
+            <span style="background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:12px;font-size:9px">酒店</span>
+            <span style="background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:12px;font-size:9px">景点</span>
+            <span style="background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:12px;font-size:9px">金融</span>
+            <span style="background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:12px;font-size:9px">生活服务</span>
+            <span style="background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:12px;font-size:9px">汽车</span>
+            <span style="background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:12px;font-size:9px">体育</span>
+            <span style="background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:12px;font-size:9px">公司企业</span>
+          </div>
+          <div style="display:flex;gap:6px;justify-content:space-between;align-items:center">
+            <span style="color:#94a3b8;font-size:9px">已选 2 项</span>
+            <div style="display:flex;gap:4px">
+              <button class="mock-button" style="font-size:9px;padding:2px 8px">全选</button>
+              <button class="mock-button" style="font-size:9px;padding:2px 8px">清空</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="accordion" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>折叠分组列表</h3>
+      <p>按大类分组可折叠展开，每行一个复选框。结构清晰但占空间较大，适合需要细分子类的场景。</p>
+      <div class="mockup">
+        <div class="mockup-header">折叠列表选择器</div>
+        <div class="mockup-body" style="background:#f8fafc;padding:12px;border-radius:8px">
+          <div style="border-bottom:1px solid #e2e8f0;padding:5px 0;font-size:10px;color:#1e293b">▼ 餐饮美食 <span style="color:#94a3b8;margin-left:4px">(已选 2/8)</span></div>
+          <div style="padding:4px 0 4px 8px;display:flex;flex-wrap:wrap;gap:3px">
+            <span style="display:flex;align-items:center;gap:2px;font-size:9px;color:#475569">☑ 中餐</span>
+            <span style="display:flex;align-items:center;gap:2px;font-size:9px;color:#475569">☐ 西餐</span>
+            <span style="display:flex;align-items:center;gap:2px;font-size:9px;color:#475569">☑ 快餐</span>
+            <span style="display:flex;align-items:center;gap:2px;font-size:9px;color:#475569">☐ 咖啡</span>
+            <span style="display:flex;align-items:center;gap:2px;font-size:9px;color:#475569">☐ 火锅</span>
+            <span style="display:flex;align-items:center;gap:2px;font-size:9px;color:#475569">☐ 烧烤</span>
+            <span style="display:flex;align-items:center;gap:2px;font-size:9px;color:#475569">☐ 日料</span>
+            <span style="display:flex;align-items:center;gap:2px;font-size:9px;color:#475569">☐ 甜点</span>
+          </div>
+          <div style="border-bottom:1px solid #e2e8f0;padding:5px 0;font-size:10px;color:#1e293b">▶ 购物消费</div>
+          <div style="border-bottom:1px solid #e2e8f0;padding:5px 0;font-size:10px;color:#1e293b">▶ 生活服务</div>
+          <div style="border-bottom:1px solid #e2e8f0;padding:5px 0;font-size:10px;color:#1e293b">▶ 医疗保健</div>
+          <div style="padding:5px 0;font-size:10px;color:#94a3b8;text-align:center">... 更多 16 个分类</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="combo" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>混合方案（推荐）</h3>
+      <p>默认收起为标签云（方案A的紧凑感），点击"更多"展开为带搜索的完整列表（方案B的完整性）。兼顾日常快速选择和偶尔的精细筛选。</p>
+      <div class="mockup">
+        <div class="mockup-header">收起状态 → 展开状态</div>
+        <div class="mockup-body" style="display:flex;gap:8px">
+          <div style="flex:1;background:#f8fafc;padding:10px;border-radius:8px">
+            <div style="color:#94a3b8;font-size:9px;margin-bottom:4px">收起（默认）</div>
+            <input class="mock-input" placeholder="🔍 搜索类别..." style="margin-bottom:6px;width:100%">
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+              <span style="background:#3b82f6;color:white;padding:2px 7px;border-radius:12px;font-size:8px">✓ 餐饮</span>
+              <span style="background:#3b82f6;color:white;padding:2px 7px;border-radius:12px;font-size:8px">✓ 购物</span>
+              <span style="background:#f1f5f9;color:#475569;padding:2px 7px;border-radius:12px;font-size:8px">医疗</span>
+              <span style="background:#f1f5f9;color:#475569;padding:2px 7px;border-radius:12px;font-size:8px">教育</span>
+              <span style="background:#f1f5f9;color:#475569;padding:2px 7px;border-radius:12px;font-size:8px">交通</span>
+              <span style="background:#f1f5f9;color:#475569;padding:2px 7px;border-radius:12px;font-size:8px">+12项</span>
+            </div>
+            <div style="text-align:right">
+              <button class="mock-button" style="font-size:8px;padding:2px 8px">更多 ▼</button>
+            </div>
+          </div>
+          <div style="flex:1;background:#f8fafc;padding:10px;border-radius:8px">
+            <div style="color:#94a3b8;font-size:9px;margin-bottom:4px">展开（点击更多）</div>
+            <div style="margin-bottom:4px">
+              <div style="font-size:9px;color:#1e293b;padding:3px 0">▼ 餐饮 (☑ 中餐 ☐ 西餐 ☑ 快餐...)</div>
+              <div style="font-size:9px;color:#1e293b;padding:3px 0">▶ 购物</div>
+              <div style="font-size:9px;color:#1e293b;padding:3px 0">▶ 生活服务</div>
+              <div style="font-size:9px;color:#1e293b;padding:3px 0">▶ 医疗保健</div>
+            </div>
+            <div style="display:flex;gap:4px">
+              <button class="mock-button" style="font-size:8px;padding:2px 8px">全选</button>
+              <button class="mock-button" style="font-size:8px;padding:2px 8px">清空</button>
+              <button class="mock-button" style="font-size:8px;padding:2px 8px;margin-left:auto">收起 ▲</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

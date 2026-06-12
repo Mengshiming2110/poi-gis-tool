@@ -1,0 +1,156 @@
+<h2>选择整体布局方案</h2>
+<p class="subtitle">考虑操作便捷性和信息密度——这是一个数据采集工具，核心是"选区域→采数据→看结果"的流程</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>经典 GIS 布局</h3>
+      <p>左侧控制面板（可折叠）+ 右侧大地图 + 底部数据表格。控制面板包含类别选择、区域工具、采集参数和操作按钮。地图占主要视觉空间，表格实时显示采集结果。</p>
+      <div class="mockup">
+        <div class="mockup-header">布局 A — 经典 GIS 三区布局</div>
+        <div class="mockup-body">
+          <div style="display:flex;gap:8px;height:280px">
+            <div style="width:200px;min-width:200px;background:#1e1e2e;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px">
+              <div style="background:#45475a;color:#cdd6f4;padding:6px 8px;border-radius:4px;font-size:11px;font-weight:bold">📋 控制面板</div>
+              <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:9px">▼ POI 类别选择</div>
+              <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:9px">▢ 餐饮 ▢ 购物 ▢ 医疗...</div>
+              <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:9px">▼ 采集模式</div>
+              <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:9px">◉ 网格 ◉ 自定义区域</div>
+              <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:9px">▼ 网格参数</div>
+              <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:9px">大小: 0.01° × 0.01°</div>
+              <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:9px">▼ 区域工具</div>
+              <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:9px">⬡ 多边形 □ 矩形 ◯ 圆形</div>
+              <div style="margin-top:auto;background:#a6e3a1;color:#1e1e2e;padding:6px 8px;border-radius:4px;font-size:10px;font-weight:bold;text-align:center">▶ 开始采集</div>
+            </div>
+            <div style="flex:1;background:#313244;border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+              <div style="position:absolute;top:0;left:0;right:0;bottom:0;opacity:0.15">
+                <div style="position:absolute;top:20%;left:30%;width:40%;height:40%;border:2px solid #89b4fa;border-radius:4px"></div>
+                <div style="position:absolute;top:15%;left:25%;width:50%;height:50%;border:1px dashed #a6e3a1"></div>
+              </div>
+              <span style="color:#6c7086;font-size:14px">🗺️ 高德地图</span>
+              <div style="position:absolute;top:10px;right:10px;background:#1e1e2e;padding:4px 8px;border-radius:4px;font-size:9px;color:#a6adc8">采集进度: 156/1200</div>
+            </div>
+          </div>
+          <div style="background:#1e1e2e;margin-top:8px;border-radius:8px;padding:8px">
+            <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:10px">📊 数据表格 — 42 条记录 | 第 1 页</div>
+            <div style="display:flex;gap:4px;margin-top:4px">
+              <div style="flex:1;background:#45475a;padding:2px 6px;border-radius:2px;font-size:8px;color:#bac2de">名称</div>
+              <div style="flex:1;background:#45475a;padding:2px 6px;border-radius:2px;font-size:8px;color:#bac2de">类别</div>
+              <div style="flex:1;background:#45475a;padding:2px 6px;border-radius:2px;font-size:8px;color:#bac2de">地址</div>
+              <div style="flex:0.5;background:#45475a;padding:2px 6px;border-radius:2px;font-size:8px;color:#bac2de">经度</div>
+              <div style="flex:0.5;background:#45475a;padding:2px 6px;border-radius:2px;font-size:8px;color:#bac2de">纬度</div>
+            </div>
+            <div style="display:flex;gap:4px;margin-top:2px">
+              <div style="flex:1;background:#313244;padding:2px 6px;border-radius:2px;font-size:8px;color:#cdd6f4">肯德基(王府井店)</div>
+              <div style="flex:1;background:#313244;padding:2px 6px;border-radius:2px;font-size:8px;color:#cdd6f4">餐饮</div>
+              <div style="flex:1;background:#313244;padding:2px 6px;border-radius:2px;font-size:8px;color:#cdd6f4">王府井大街xx号</div>
+              <div style="flex:0.5;background:#313244;padding:2px 6px;border-radius:2px;font-size:8px;color:#cdd6f4">116.41</div>
+              <div style="flex:0.5;background:#313244;padding:2px 6px;border-radius:2px;font-size:8px;color:#cdd6f4">39.91</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>悬浮面板布局</h3>
+      <p>全屏地图最大化可视面积。控制面板以可拖拽浮窗形式叠在地图上，底部有缩略数据条。类似 Google Maps 的风格，地图是主角。</p>
+      <div class="mockup">
+        <div class="mockup-header">布局 B — 全屏地图 + 悬浮面板</div>
+        <div class="mockup-body">
+          <div style="position:relative;height:320px;background:#313244;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+            <div style="position:absolute;top:0;left:0;right:0;bottom:0;opacity:0.12">
+              <div style="position:absolute;top:15%;left:20%;right:15%;bottom:15%;border:1px dashed #a6e3a1"></div>
+            </div>
+            <span style="color:#6c7086;font-size:18px">🗺️ 高德地图（全屏）</span>
+            <!-- Floating panel -->
+            <div style="position:absolute;top:12px;left:12px;width:260px;background:#1e1e2e;border-radius:10px;padding:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);z-index:10">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="color:#cdd6f4;font-size:11px;font-weight:bold">🎛️ 采集控制</span>
+                <span style="color:#6c7086;font-size:9px">_ □ ×</span>
+              </div>
+              <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:9px;margin-bottom:4px">类别: 餐饮 + 购物 + 医疗 (3项)</div>
+              <div style="background:#313244;color:#a6adc8;padding:4px 8px;border-radius:4px;font-size:9px;margin-bottom:4px">模式: 自定义区域 ⬡</div>
+              <div style="background:#a6e3a1;color:#1e1e2e;padding:5px 8px;border-radius:4px;font-size:10px;font-weight:bold;text-align:center;margin-top:8px">▶ 开始采集</div>
+              <div style="margin-top:6px;background:#313244;border-radius:4px;height:4px"><div style="background:#89b4fa;height:100%;width:35%;border-radius:4px"></div></div>
+              <div style="color:#a6adc8;font-size:8px;text-align:center;margin-top:2px">420/1200 格</div>
+            </div>
+            <!-- Bottom bar -->
+            <div style="position:absolute;bottom:0;left:0;right:0;background:#1e1e2e;padding:6px 16px;display:flex;align-items:center;gap:12px;border-top:1px solid #45475a">
+              <span style="color:#a6e3a1;font-size:10px">✓ 1200个POI</span>
+              <span style="color:#89b4fa;font-size:10px">📥 Excel</span>
+              <span style="color:#89b4fa;font-size:10px">📥 GeoJSON</span>
+              <span style="margin-left:auto;color:#6c7086;font-size:9px">1200/1200 格完成</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>双栏工作台布局</h3>
+      <p>左侧控制区（固定30%宽度）包含类别选择、参数配置、采集进度。右侧是地图+数据表格的上下分屏。适合需要频繁切换参数和查看结果的场景。</p>
+      <div class="mockup">
+        <div class="mockup-header">布局 C — 双栏工作台</div>
+        <div class="mockup-body">
+          <div style="display:flex;gap:8px;height:320px">
+            <div style="width:220px;min-width:220px;background:#1e1e2e;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto">
+              <div style="color:#cdd6f4;font-size:12px;font-weight:bold">🎛️ 采集控制台</div>
+              <div style="background:#313244;border-radius:6px;padding:6px">
+                <div style="color:#a6adc8;font-size:9px;font-weight:bold;margin-bottom:4px">POI 类别</div>
+                <div style="display:flex;flex-wrap:wrap;gap:3px">
+                  <span style="background:#89b4fa;color:#1e1e2e;padding:1px 5px;border-radius:3px;font-size:8px">餐饮</span>
+                  <span style="background:#89b4fa;color:#1e1e2e;padding:1px 5px;border-radius:3px;font-size:8px">购物</span>
+                  <span style="background:#45475a;color:#a6adc8;padding:1px 5px;border-radius:3px;font-size:8px">医疗</span>
+                  <span style="background:#45475a;color:#a6adc8;padding:1px 5px;border-radius:3px;font-size:8px">教育</span>
+                </div>
+              </div>
+              <div style="background:#313244;border-radius:6px;padding:6px">
+                <div style="color:#a6adc8;font-size:9px;font-weight:bold;margin-bottom:4px">采集模式</div>
+                <div style="display:flex;gap:4px">
+                  <span style="background:#89b4fa;color:#1e1e2e;padding:2px 6px;border-radius:3px;font-size:8px">网格</span>
+                  <span style="background:#313244;color:#6c7086;padding:2px 6px;border-radius:3px;font-size:8px">区域</span>
+                </div>
+              </div>
+              <div style="background:#313244;border-radius:6px;padding:6px">
+                <div style="color:#a6adc8;font-size:9px;font-weight:bold;margin-bottom:4px">任务状态</div>
+                <div style="color:#a6e3a1;font-size:9px">● 采集中...</div>
+                <div style="color:#a6adc8;font-size:9px">已完成 156/400 格</div>
+                <div style="background:#313244;border-radius:3px;height:4px;margin-top:4px"><div style="background:#89b4fa;height:100%;width:39%;border-radius:3px"></div></div>
+              </div>
+              <div style="margin-top:auto;display:flex;flex-direction:column;gap:4px">
+                <div style="background:#a6e3a1;color:#1e1e2e;padding:6px;border-radius:4px;font-size:10px;font-weight:bold;text-align:center">▶ 开始</div>
+                <div style="background:#f38ba8;color:#1e1e2e;padding:6px;border-radius:4px;font-size:10px;font-weight:bold;text-align:center">⏸ 暂停</div>
+              </div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <div style="flex:1;background:#313244;border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative">
+                <span style="color:#6c7086">🗺️ 高德地图</span>
+                <div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">
+                  <span style="background:#1e1e2e;color:#a6adc8;padding:3px 8px;border-radius:4px;font-size:9px">⬡ 多边形</span>
+                  <span style="background:#1e1e2e;color:#a6adc8;padding:3px 8px;border-radius:4px;font-size:9px">□ 矩形</span>
+                  <span style="background:#1e1e2e;color:#a6adc8;padding:3px 8px;border-radius:4px;font-size:9px">◯ 圆形</span>
+                </div>
+              </div>
+              <div style="background:#1e1e2e;border-radius:8px;padding:8px;height:100px">
+                <div style="color:#a6adc8;font-size:10px">📊 数据预览 — 共 1200 条 | <span style="color:#89b4fa">📥 导出 Excel</span> | <span style="color:#89b4fa">📥 导出 GeoJSON</span></div>
+                <div style="margin-top:4px;display:flex;gap:4px">
+                  <div style="flex:1;background:#313244;padding:3px 6px;border-radius:2px;font-size:8px;color:#cdd6f4">星巴克(国贸店)</div>
+                  <div style="flex:1;background:#313244;padding:3px 6px;border-radius:2px;font-size:8px;color:#cdd6f4">麦当劳(三里屯)</div>
+                  <div style="flex:1;background:#313244;padding:3px 6px;border-radius:2px;font-size:8px;color:#cdd6f4">海底捞(西单店)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

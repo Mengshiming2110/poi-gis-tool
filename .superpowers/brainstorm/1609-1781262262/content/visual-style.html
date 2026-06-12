@@ -1,0 +1,84 @@
+<h2>选择视觉风格</h2>
+<p class="subtitle">工具长时间使用，配色影响效率和舒适度。考虑这是一个数据采集工具——可能盯着屏幕看很久。</p>
+
+<div class="options">
+  <div class="option" data-choice="dark" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>暗色专业风</h3>
+      <p>深色背景减少眼部疲劳，适合长时间数据采集。高亮色用于关键操作按钮和进度指示。地图色彩保持高德原生风格，与暗色面板形成对比。</p>
+      <div class="mockup">
+        <div class="mockup-header">暗色主题预览</div>
+        <div class="mockup-body">
+          <div style="position:relative;height:200px;background:#1a1a2e;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+            <div style="position:absolute;top:12px;left:12px;width:220px;background:rgba(22,22,44,0.95);border-radius:8px;padding:10px;box-shadow:0 4px 16px rgba(0,0,0,0.6);backdrop-filter:blur(8px)">
+              <div style="color:#e0e0e0;font-size:11px;font-weight:bold;margin-bottom:6px">🎛️ 采集控制</div>
+              <div style="background:#2a2a4a;color:#b0b0d0;padding:4px 8px;border-radius:4px;font-size:9px;margin-bottom:4px">类别: ▢ 餐饮 ▢ 购物 ▢ 医疗</div>
+              <div style="background:#2a2a4a;color:#b0b0d0;padding:4px 8px;border-radius:4px;font-size:9px;margin-bottom:4px">模式: 🟢 网格 0.01°</div>
+              <div style="background:#4ade80;color:#0f172a;padding:5px 8px;border-radius:4px;font-size:10px;font-weight:bold;text-align:center;margin-top:6px">▶ 开始采集</div>
+              <div style="margin-top:6px;background:#2a2a4a;border-radius:4px;height:4px"><div style="background:#60a5fa;height:100%;width:45%;border-radius:4px"></div></div>
+              <div style="color:#b0b0d0;font-size:8px;text-align:center;margin-top:2px">540/1200 格</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="light" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>亮色清爽风</h3>
+      <p>浅色背景干净清晰，白天办公环境下对比度更好。圆角和柔和的阴影让界面更亲和，适合不熟悉 GIS 工具的新用户。</p>
+      <div class="mockup">
+        <div class="mockup-header">亮色主题预览</div>
+        <div class="mockup-body">
+          <div style="position:relative;height:200px;background:#e8f0fe;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+            <div style="position:absolute;top:12px;left:12px;width:220px;background:rgba(255,255,255,0.95);border-radius:10px;padding:10px;box-shadow:0 2px 12px rgba(0,0,0,0.1)">
+              <div style="color:#1e293b;font-size:11px;font-weight:bold;margin-bottom:6px">🎛️ 采集控制</div>
+              <div style="background:#f1f5f9;color:#475569;padding:4px 8px;border-radius:6px;font-size:9px;margin-bottom:4px">类别: ▢ 餐饮 ▢ 购物 ▢ 医疗</div>
+              <div style="background:#f1f5f9;color:#475569;padding:4px 8px;border-radius:6px;font-size:9px;margin-bottom:4px">模式: 🔵 网格 0.01°</div>
+              <div style="background:#3b82f6;color:white;padding:5px 8px;border-radius:6px;font-size:10px;font-weight:bold;text-align:center;margin-top:6px">▶ 开始采集</div>
+              <div style="margin-top:6px;background:#e2e8f0;border-radius:4px;height:4px"><div style="background:#3b82f6;height:100%;width:45%;border-radius:4px"></div></div>
+              <div style="color:#94a3b8;font-size:8px;text-align:center;margin-top:2px">540/1200 格</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="system" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>跟随系统</h3>
+      <p>同时支持暗色/亮色两套主题，自动跟随操作系统设置切换。开发量稍大但体验最好，适配不同使用环境。</p>
+      <div class="split">
+        <div class="mockup">
+          <div class="mockup-header">暗色模式</div>
+          <div class="mockup-body">
+            <div style="height:120px;background:#1a1a2e;border-radius:6px;display:flex;align-items:center;justify-content:center">
+              <div style="width:160px;background:rgba(22,22,44,0.95);border-radius:8px;padding:8px">
+                <div style="color:#e0e0e0;font-size:9px;font-weight:bold">🎛️ 采集控制</div>
+                <div style="background:#2a2a4a;color:#b0b0d0;padding:3px 6px;border-radius:4px;font-size:8px;margin:4px 0">类别: 餐饮 + 购物</div>
+                <div style="background:#4ade80;color:#0f172a;padding:4px 6px;border-radius:4px;font-size:8px;text-align:center;font-weight:bold">▶ 开始采集</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup">
+          <div class="mockup-header">亮色模式</div>
+          <div class="mockup-body">
+            <div style="height:120px;background:#f8fafc;border-radius:6px;display:flex;align-items:center;justify-content:center">
+              <div style="width:160px;background:rgba(255,255,255,0.95);border-radius:8px;padding:8px;box-shadow:0 1px 8px rgba(0,0,0,0.08)">
+                <div style="color:#1e293b;font-size:9px;font-weight:bold">🎛️ 采集控制</div>
+                <div style="background:#f1f5f9;color:#475569;padding:3px 6px;border-radius:6px;font-size:8px;margin:4px 0">类别: 餐饮 + 购物</div>
+                <div style="background:#3b82f6;color:white;padding:4px 6px;border-radius:6px;font-size:8px;text-align:center">▶ 开始采集</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

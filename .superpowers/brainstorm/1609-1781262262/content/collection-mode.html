@@ -1,0 +1,77 @@
+<h2>采集模式与参数面板</h2>
+<p class="subtitle">两种模式：网格自动切分 vs 自定义区域绘制。面板需要清晰切换，参数简洁直观。</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>分段切换 + 内联参数</h3>
+      <p>顶部 Segmented Control 切换模式，参数直接显示在当前模式下方。地图工具栏独立一行放绘制工具。紧凑高效。</p>
+      <div class="mockup">
+        <div class="mockup-header">方案 A — 分段切换</div>
+        <div class="mockup-body" style="background:#f8fafc;padding:12px;border-radius:8px">
+          <!-- Segmented control -->
+          <div style="display:flex;background:#e2e8f0;border-radius:8px;padding:2px;margin-bottom:8px">
+            <div style="flex:1;background:white;text-align:center;padding:5px;border-radius:6px;font-size:10px;font-weight:bold;color:#1e293b;box-shadow:0 1px 3px rgba(0,0,0,0.1)">⊞ 网格采集</div>
+            <div style="flex:1;text-align:center;padding:5px;border-radius:6px;font-size:10px;color:#64748b">⬡ 区域采集</div>
+          </div>
+          <!-- Grid params -->
+          <div style="margin-bottom:6px">
+            <div style="font-size:9px;color:#64748b;margin-bottom:3px">网格精度</div>
+            <div style="display:flex;gap:4px">
+              <button class="mock-button" style="font-size:9px;padding:3px 8px;background:#3b82f6;color:white;border-radius:4px">0.005°</button>
+              <button class="mock-button" style="font-size:9px;padding:3px 8px">0.01°</button>
+              <button class="mock-button" style="font-size:9px;padding:3px 8px">0.02°</button>
+              <button class="mock-button" style="font-size:9px;padding:3px 8px">0.05°</button>
+            </div>
+            <div style="font-size:8px;color:#94a3b8;margin-top:3px">精度越高 → 格子越小 → 采集越完整（0.01°≈1.1km）</div>
+          </div>
+          <div style="font-size:9px;color:#475569;margin-bottom:8px">估计网格数: <b>~400格</b> · 预计耗时: <b>~8分钟</b></div>
+          <!-- Map drawing tools -->
+          <div style="border-top:1px solid #e2e8f0;padding-top:6px;margin-bottom:6px">
+            <div style="font-size:9px;color:#64748b;margin-bottom:3px">地图绘制工具</div>
+            <div style="display:flex;gap:4px">
+              <button class="mock-button" style="font-size:9px;padding:3px 8px">⬡ 多边形</button>
+              <button class="mock-button" style="font-size:9px;padding:3px 8px">□ 矩形</button>
+              <button class="mock-button" style="font-size:9px;padding:3px 8px">◯ 圆形</button>
+              <button class="mock-button" style="font-size:9px;padding:3px 8px">✕ 清除</button>
+            </div>
+          </div>
+          <div style="background:#3b82f6;color:white;padding:6px;border-radius:6px;font-size:10px;text-align:center;font-weight:bold;cursor:pointer">▶ 开始采集</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tab 页签 + 地图优先</h3>
+      <p>面板更简洁——模式用两个图标 Tab 切换，地图工具栏常驻在面板外部（地图右上角浮动）。参数最少化。</p>
+      <div class="mockup">
+        <div class="mockup-header">方案 B — Tab 页签</div>
+        <div class="mockup-body" style="background:#f8fafc;padding:12px;border-radius:8px">
+          <!-- Tab switcher -->
+          <div style="display:flex;gap:4px;margin-bottom:8px;border-bottom:2px solid #e2e8f0;padding-bottom:6px">
+            <div style="padding:4px 8px;border-bottom:2px solid #3b82f6;margin-bottom:-8px;font-size:10px;font-weight:bold;color:#3b82f6">⊞ 网格</div>
+            <div style="padding:4px 8px;font-size:10px;color:#94a3b8">⬡ 区域</div>
+          </div>
+          <!-- Simple grid settings -->
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:9px;color:#64748b">精度</span>
+            <select style="flex:1;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:9px">
+              <option>0.01° (推荐 ~1.1km)</option>
+              <option>0.005° (~550m)</option>
+              <option>0.02° (~2.2km)</option>
+            </select>
+          </div>
+          <div style="font-size:9px;color:#475569;margin-bottom:8px">🎯 估计 ~400 格 · ~8 分钟</div>
+          <div style="background:#3b82f6;color:white;padding:6px;border-radius:6px;font-size:10px;text-align:center;font-weight:bold">▶ 开始采集</div>
+          <div style="margin-top:8px;border-top:1px solid #e2e8f0;padding-top:8px">
+            <div style="font-size:9px;color:#64748b;margin-bottom:3px">⚠️ 注意：区域模式下，请先在地图右上角工具栏绘制区域</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
