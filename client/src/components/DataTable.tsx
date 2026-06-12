@@ -1,25 +1,48 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { CaretLeft, CaretRight, MagnifyingGlass } from '@phosphor-icons/react';
 import { queryPois } from '../services/api';
-import type { PoiRecord } from '../types/poi';
+import type { PoiRecord, TaskStatus } from '../types/poi';
 
 interface DataTableProps {
   taskId: string | null;
+  status: TaskStatus;
 }
 
-function DataTable({ taskId }: DataTableProps) {
+function DataTable({ taskId, status }: DataTableProps) {
   const [pois, setPois] = useState<PoiRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const pageSize = 50;
+  const prevStatusRef = useRef<TaskStatus>(status);
 
+  // Fetch on: taskId change, page change, search change, or status -> done
   useEffect(() => {
     if (!taskId) return;
     queryPois({ taskId, page, pageSize, search: search || undefined })
       .then(r => { setPois(r.pois); setTotal(r.total); })
       .catch(console.error);
   }, [taskId, page, search]);
+
+  // Auto-refresh when collection finishes
+  useEffect(() => {
+    if (status === 'done' && prevStatusRef.current !== 'done') {
+      setPage(1); // triggers re-fetch via the effect above
+    }
+    prevStatusRef.current = status;
+  }, [status]);
+
+  // Periodic refresh while collecting
+  useEffect(() => {
+    if (status !== 'running') return;
+    const timer = setInterval(() => {
+      if (!taskId) return;
+      queryPois({ taskId, page: 1, pageSize, search: search || undefined })
+        .then(r => { setPois(r.pois); setTotal(r.total); })
+        .catch(console.error);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [status, taskId, search]);
 
   const totalPages = Math.ceil(total / pageSize);
 

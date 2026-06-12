@@ -132,7 +132,7 @@ function ProgressDrawer({ status, progress, totalPois, taskId, onPause, onResume
         {/* DataTable — visible only when expanded */}
         {expanded && taskId && (
           <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 8, paddingTop: 4 }}>
-            <DataTable taskId={taskId} />
+            <DataTable taskId={taskId} status={status} />
           </div>
         )}
       </div>

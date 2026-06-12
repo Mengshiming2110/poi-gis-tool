@@ -44,6 +44,13 @@ router.get('/:id', (req: Request, res: Response) => {
 router.get('/:id/progress', (req: Request, res: Response) => {
   const taskId = req.params.id;
 
+  // Verify task exists before opening SSE stream
+  const task = getTask(taskId);
+  if (!task) {
+    res.status(404).json({ error: '任务不存在' });
+    return;
+  }
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -51,29 +58,33 @@ router.get('/:id/progress', (req: Request, res: Response) => {
   });
 
   const sendEvent = (event: string, data: any) => {
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    try {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    } catch (e) {
+      clearInterval(interval);
+    }
   };
 
   // Poll the database every second for progress updates
   const interval = setInterval(() => {
-    const task = getTask(taskId);
-    if (!task) {
+    const current = getTask(taskId);
+    if (!current) {
       clearInterval(interval);
       sendEvent('error', { error: '任务不存在' });
       res.end();
       return;
     }
+    // Send progress first, then check terminal states
     sendEvent('progress', {
-      doneCells: task.done_cells,
-      totalCells: task.total_cells,
-      totalPois: task.total_pois,
+      doneCells: current.done_cells,
+      totalCells: current.total_cells,
+      totalPois: current.total_pois,
     });
-    if (task.status === 'done') {
-      sendEvent('complete', { totalPois: task.total_pois });
+    if (current.status === 'done') {
+      sendEvent('complete', { totalPois: current.total_pois });
       clearInterval(interval);
       res.end();
-    }
-    if (task.status === 'cancelled') {
+    } else if (current.status === 'cancelled') {
       sendEvent('cancelled', {});
       clearInterval(interval);
       res.end();
