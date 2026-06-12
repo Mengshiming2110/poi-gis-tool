@@ -3,16 +3,22 @@ import { SlidersHorizontal } from '@phosphor-icons/react';
 import CategoryPicker from './CategoryPicker';
 import CollectionMode from './CollectionMode';
 import type { TaskMode } from '../types/poi';
+import type { DrawnShape, GridCell } from './MapView';
 
 interface ControlPanelProps {
   selectedCategories: string[];
   onCategoriesChange: (codes: string[]) => void;
   mode: TaskMode;
   gridSize: number;
+  gridSizeMeters: number;
   estimatedCells: number;
   estimatedMinutes: number;
+  drawnShape: DrawnShape | null;
+  gridCells: GridCell[];
   onModeChange: (mode: TaskMode) => void;
   onGridSizeChange: (size: number) => void;
+  onGridSizeMetersChange: (meters: number) => void;
+  onSplitGrid: () => void;
   onStart: () => void;
   disabled: boolean;
 }
@@ -57,10 +63,15 @@ function ControlPanel(props: ControlPanelProps) {
       <CollectionMode
         mode={props.mode}
         gridSize={props.gridSize}
+        gridSizeMeters={props.gridSizeMeters}
         estimatedCells={props.estimatedCells}
         estimatedMinutes={props.estimatedMinutes}
+        drawnShape={props.drawnShape}
+        gridCells={props.gridCells}
         onModeChange={props.onModeChange}
         onGridSizeChange={props.onGridSizeChange}
+        onGridSizeMetersChange={props.onGridSizeMetersChange}
+        onSplitGrid={props.onSplitGrid}
         onStart={props.onStart}
         disabled={props.disabled}
       />

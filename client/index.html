@@ -7,6 +7,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- 高德地图 JS API，带所有插件 -->
+    <script type="text/javascript">
+      window._AMapSecurityConfig = {
+        securityJsCode: (function() {
+          return localStorage.getItem('amap_security_code') || '8d13a7d3f6ecff69f02dc1dea5855b0a';
+        })(),
+      };
+    </script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=35f0e1144644fbfba405c109db466cdc&plugin=AMap.PlaceSearch,AMap.MouseTool,AMap.Geolocation,AMap.Scale,AMap.ToolBar"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

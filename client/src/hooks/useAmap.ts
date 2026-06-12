@@ -1,40 +1,50 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import AMapLoader from '@amap/amap-jsapi-loader';
-
-function getConfig() {
-  return {
-    key: localStorage.getItem('amap_js_key') || '35f0e1144644fbfba405c109db466cdc',
-    securityCode: localStorage.getItem('amap_security_code') || '8d13a7d3f6ecff69f02dc1dea5855b0a',
-  };
-}
-
-window._AMapSecurityConfig = { securityJsCode: getConfig().securityCode };
 
 export type DrawMode = 'polygon' | 'rectangle' | 'circle' | null;
 
 export interface DrawnShape {
   type: 'polygon' | 'rectangle' | 'circle';
-  geometry: any;       // polygon: [lng,lat][] | rectangle: {bounds: [[lng,lat],[lng,lat]], path: [lng,lat][]} | circle: {center: [lng,lat], radius: number}
-  overlay: any;        // AMap.Polygon | AMap.Rectangle | AMap.Circle
+  geometry: any;
+  overlay: any;
+}
+
+export interface GridCell {
+  sw: [number, number];
+  ne: [number, number];
+  center: [number, number];
+  bounds: [[number, number], [number, number]];
+}
+
+// Config from localStorage, fallback to defaults
+function getConfig() {
+  return {
+    jsKey: localStorage.getItem('amap_js_key') || '35f0e1144644fbfba405c109db466cdc',
+    securityCode: localStorage.getItem('amap_security_code') || '8d13a7d3f6ecff69f02dc1dea5855b0a',
+  };
 }
 
 export function useAmap(containerId: string) {
   const mapRef = useRef<any>(null);
   const mouseToolRef = useRef<any>(null);
   const drawnShapeRef = useRef<DrawnShape | null>(null);
-  const currentDrawModeRef = useRef<DrawMode>(null);
+  const gridOverlaysRef = useRef<any[]>([]);
+  const poiMarkersRef = useRef<any[]>([]);
   const [map, setMap] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
+  const [drawMode, setDrawModeState] = useState<DrawMode>(null);
+  const [drawnShape, setDrawnShape] = useState<DrawnShape | null>(null);
+  const [gridCells, setGridCells] = useState<GridCell[]>([]);
 
+  // Poll until window.AMap is available, then init
   useEffect(() => {
     let destroyed = false;
-    const { key, securityCode } = getConfig();
-    window._AMapSecurityConfig = { securityJsCode: securityCode };
+    let checkCount = 0;
 
-    AMapLoader.load({ key, version: '2.0' })
-      .then((AMap: any) => {
-        if (destroyed) return;
+    function tryInit() {
+      if (destroyed) return;
 
+      if (window.AMap) {
+        const AMap = window.AMap;
         const instance = new AMap.Map(containerId, {
           zoom: 12,
           center: [116.397428, 39.90923],
@@ -42,52 +52,60 @@ export function useAmap(containerId: string) {
           resizeEnable: true,
         });
 
+        instance.addControl(new AMap.Scale({ position: 'LB' }));
+        instance.addControl(new AMap.ToolBar({ position: 'RT' }));
+
+        const mouseTool = new AMap.MouseTool(instance);
+        mouseToolRef.current = mouseTool;
+
+        mouseTool.on('draw', (event: any) => {
+          const { obj } = event;
+          let shapeInfo: DrawnShape | null = null;
+
+          if (obj instanceof AMap.Polygon) {
+            const path = obj.getPath().map((p: any) => [p.lng, p.lat]);
+            shapeInfo = { type: 'polygon', geometry: path, overlay: obj };
+          } else if (obj instanceof AMap.Rectangle) {
+            const bounds = obj.getBounds();
+            const sw: [number, number] = [bounds.getSouthWest().lng, bounds.getSouthWest().lat];
+            const ne: [number, number] = [bounds.getNorthEast().lng, bounds.getNorthEast().lat];
+            const rectPath: [number, number][] = [sw, [ne[0], sw[1]], ne, [sw[0], ne[1]]];
+            shapeInfo = { type: 'rectangle', geometry: { path: rectPath, bounds: [sw, ne] }, overlay: obj };
+          } else if (obj instanceof AMap.Circle) {
+            const center = obj.getCenter();
+            const radius = obj.getRadius();
+            shapeInfo = { type: 'circle', geometry: { center: [center.lng, center.lat], radius }, overlay: obj };
+          }
+
+          if (shapeInfo) {
+            // Remove old shape
+            if (drawnShapeRef.current?.overlay) {
+              try { instance.remove(drawnShapeRef.current.overlay); } catch (e) {}
+            }
+            // Clear old grids
+            gridOverlaysRef.current.forEach(o => { try { instance.remove(o); } catch (e) {} });
+            gridOverlaysRef.current = [];
+
+            drawnShapeRef.current = shapeInfo;
+            setDrawnShape(shapeInfo);
+            setGridCells([]);
+          }
+          mouseTool.close(true);
+        });
+
         mapRef.current = instance;
         setMap(instance);
+        setLoaded(true);
+        return;
+      }
 
-        // Load plugins via native AMap.plugin()
-        AMap.plugin(['AMap.MouseTool', 'AMap.Geolocation', 'AMap.PlaceSearch', 'AMap.Scale', 'AMap.ToolBar'], () => {
-          if (destroyed) return;
+      checkCount++;
+      if (checkCount < 50) { // max ~25 seconds
+        setTimeout(tryInit, 500);
+      }
+    }
 
-          instance.addControl(new AMap.Scale({ position: 'LB' }));
-          instance.addControl(new AMap.ToolBar({ position: 'RT' }));
-
-          const mouseTool = new AMap.MouseTool(instance);
-          mouseToolRef.current = mouseTool;
-
-          mouseTool.on('draw', (event: any) => {
-            const { obj } = event;
-            const mode = currentDrawModeRef.current;
-            let shapeInfo: DrawnShape | null = null;
-
-            if (mode === 'polygon' && obj instanceof AMap.Polygon) {
-              const path = obj.getPath().map((p: any) => [p.lng, p.lat]);
-              shapeInfo = { type: 'polygon', geometry: path, overlay: obj };
-            } else if (mode === 'rectangle' && obj instanceof AMap.Rectangle) {
-              const bounds = obj.getBounds();
-              const sw = [bounds.getSouthWest().lng, bounds.getSouthWest().lat];
-              const ne = [bounds.getNorthEast().lng, bounds.getNorthEast().lat];
-              const rectPath = [sw, [ne[0], sw[1]], ne, [sw[0], ne[1]]];
-              shapeInfo = { type: 'rectangle', geometry: { bounds: [sw, ne], path: rectPath }, overlay: obj };
-            } else if (mode === 'circle' && obj instanceof AMap.Circle) {
-              const center = obj.getCenter();
-              const radius = obj.getRadius();
-              shapeInfo = { type: 'circle', geometry: { center: [center.lng, center.lat], radius }, overlay: obj };
-            }
-
-            if (shapeInfo) {
-              if (drawnShapeRef.current?.overlay) {
-                try { instance.remove(drawnShapeRef.current.overlay); } catch (e) {}
-              }
-              drawnShapeRef.current = shapeInfo;
-            }
-            mouseTool.close(true);
-          });
-
-          setLoaded(true);
-        });
-      })
-      .catch((err: any) => console.error('高德地图加载失败:', err));
+    tryInit();
 
     return () => {
       destroyed = true;
@@ -98,15 +116,18 @@ export function useAmap(containerId: string) {
     };
   }, [containerId]);
 
-  // Switch draw mode — close & reopen with style options
+  // Draw mode switching via useEffect (like reference)
   const setDrawMode = useCallback((mode: DrawMode) => {
+    setDrawModeState(mode);
+  }, []);
+
+  useEffect(() => {
     const mt = mouseToolRef.current;
     if (!mt) return;
 
     mt.close(true);
-    currentDrawModeRef.current = mode;
 
-    if (!mode) return;
+    if (!drawMode) return;
 
     const styleOpts = {
       strokeWeight: 3,
@@ -115,14 +136,14 @@ export function useAmap(containerId: string) {
       strokeStyle: 'dashed',
     };
 
-    if (mode === 'polygon') {
+    if (drawMode === 'polygon') {
       mt.polygon({ ...styleOpts, strokeColor: '#4A90D9', fillColor: '#4A90D9' });
-    } else if (mode === 'rectangle') {
+    } else if (drawMode === 'rectangle') {
       mt.rectangle({ ...styleOpts, strokeColor: '#27AE60', fillColor: '#27AE60' });
-    } else if (mode === 'circle') {
+    } else if (drawMode === 'circle') {
       mt.circle({ ...styleOpts, strokeColor: '#F39C12', fillColor: '#F39C12' });
     }
-  }, []);
+  }, [drawMode]);
 
   const getBounds = useCallback(() => {
     if (!mapRef.current) return null;
@@ -137,35 +158,127 @@ export function useAmap(containerId: string) {
     if (drawnShapeRef.current?.overlay && mapRef.current) {
       try { mapRef.current.remove(drawnShapeRef.current.overlay); } catch (e) {}
     }
+    gridOverlaysRef.current.forEach(o => { try { mapRef.current?.remove(o); } catch (e) {} });
+    gridOverlaysRef.current = [];
     drawnShapeRef.current = null;
+    setDrawnShape(null);
+    setGridCells([]);
   }, []);
 
   const getDrawnShape = useCallback((): DrawnShape | null => {
     return drawnShapeRef.current;
   }, []);
 
+  // Grid split function (reference-style)
+  const splitGrid = useCallback((gridSizeMeters: number) => {
+    const shape = drawnShapeRef.current;
+    const instance = mapRef.current;
+    if (!shape || !instance) return 0;
+
+    // Clear old grids
+    gridOverlaysRef.current.forEach(o => { try { instance.remove(o); } catch (e) {} });
+    gridOverlaysRef.current = [];
+
+    let bounds: [[number, number], [number, number]];
+    let filterFn: (cell: GridCell) => boolean;
+
+    if (shape.type === 'polygon') {
+      const lngs = shape.geometry.map((p: number[]) => p[0]);
+      const lats = shape.geometry.map((p: number[]) => p[1]);
+      bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
+      filterFn = (cell) => pointInPolygon(cell.center, shape.geometry);
+    } else if (shape.type === 'rectangle') {
+      bounds = shape.geometry.bounds;
+      filterFn = (cell) => pointInPolygon(cell.center, shape.geometry.path);
+    } else {
+      const [clng, clat] = shape.geometry.center;
+      const r = shape.geometry.radius;
+      const latDeg = r / 111320;
+      const lngDeg = r / (111320 * Math.cos((clat * Math.PI) / 180));
+      bounds = [[clng - lngDeg, clat - latDeg], [clng + lngDeg, clat + latDeg]];
+      filterFn = (cell) => pointInCircle(cell.center, shape.geometry.center, r);
+    }
+
+    const cells = generateGridCells(bounds, gridSizeMeters);
+    const validCells = cells.filter(filterFn);
+
+    // Draw grid on map
+    const AMap = window.AMap;
+    const newOverlays: any[] = [];
+    validCells.forEach(cell => {
+      const rect = new AMap.Rectangle({
+        bounds: new AMap.Bounds(
+          new AMap.LngLat(cell.sw[0], cell.sw[1]),
+          new AMap.LngLat(cell.ne[0], cell.ne[1])
+        ),
+        strokeColor: '#888',
+        strokeWeight: 1,
+        strokeOpacity: 0.5,
+        fillColor: '#4A90D9',
+        fillOpacity: 0.06,
+        strokeStyle: 'solid',
+      });
+      rect.setMap(instance);
+      newOverlays.push(rect);
+    });
+    gridOverlaysRef.current = newOverlays;
+    setGridCells(validCells);
+    return validCells.length;
+  }, []);
+
   const locateMe = useCallback(() => {
-    if (!mapRef.current) return;
-    if (!navigator.geolocation) return;
+    if (!mapRef.current || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        mapRef.current.setZoomAndCenter(15, [pos.coords.longitude, pos.coords.latitude]);
-      },
-      () => {
-        if (window.AMap) {
-          window.AMap.plugin('AMap.Geolocation', () => {
-            const geolocation = new window.AMap.Geolocation({ enableHighAccuracy: true });
-            geolocation.getCurrentPosition((status: string, result: any) => {
-              if (status === 'complete') {
-                mapRef.current.setZoomAndCenter(15, [result.position.lng, result.position.lat]);
-              }
-            });
-          });
-        }
-      },
-      { timeout: 5000, enableHighAccuracy: true },
+      (pos) => { mapRef.current.setZoomAndCenter(15, [pos.coords.longitude, pos.coords.latitude]); },
+      () => {},
+      { timeout: 5000, enableHighAccuracy: true }
     );
   }, []);
 
-  return { map, loaded, getBounds, setDrawMode, clearDrawings, getDrawnShape, locateMe };
+  return { map, loaded, getBounds, setDrawMode, clearDrawings, getDrawnShape, splitGrid,
+           drawMode, drawnShape, gridCells, locateMe };
+}
+
+// --- Geometry helpers ---
+function pointInPolygon(point: [number, number], polygon: [number, number][]): boolean {
+  const [px, py] = point;
+  let inside = false;
+  const n = polygon.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function pointInCircle(point: [number, number], center: [number, number], radiusMeters: number): boolean {
+  const [px, py] = point;
+  const [cx, cy] = center;
+  const latDiff = (py - cy) * 111320;
+  const lngDiff = (px - cx) * 111320 * Math.cos((cy * Math.PI) / 180);
+  return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff) <= radiusMeters;
+}
+
+function generateGridCells(bounds: [[number, number], [number, number]], gridSizeMeters: number): GridCell[] {
+  const [[swLng, swLat], [neLng, neLat]] = bounds;
+  const latStep = gridSizeMeters / 111320;
+  const midLat = (swLat + neLat) / 2;
+  const lngStep = gridSizeMeters / (111320 * Math.cos((midLat * Math.PI) / 180));
+  const cells: GridCell[] = [];
+  for (let lat = swLat; lat < neLat; lat += latStep) {
+    for (let lng = swLng; lng < neLng; lng += lngStep) {
+      const cellSw: [number, number] = [lng, lat];
+      const cellNe: [number, number] = [Math.min(lng + lngStep, neLng), Math.min(lat + latStep, neLat)];
+      cells.push({
+        sw: cellSw,
+        ne: cellNe,
+        center: [(cellSw[0] + cellNe[0]) / 2, (cellSw[1] + cellNe[1]) / 2],
+        bounds: [cellSw, cellNe],
+      });
+    }
+  }
+  return cells;
 }

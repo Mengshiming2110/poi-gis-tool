@@ -8,53 +8,70 @@ import { useCollection } from './hooks/useCollection';
 import { useSSE } from './hooks/useSSE';
 import { getExportUrl } from './services/api';
 import type { TaskMode } from './types/poi';
-import type { DrawMode } from './components/MapView';
+import type { DrawMode, MapAPI, DrawnShape, GridCell } from './components/MapView';
 import './App.css';
 
 function App() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [mode, setMode] = useState<TaskMode>('grid');
+  const [mode, setMode] = useState<TaskMode>('region');
   const [gridSize, setGridSize] = useState(0.01);
-  const [drawMode, setDrawMode] = useState<'polygon' | 'rectangle' | 'circle' | null>(null);
+  const [gridSizeMeters, setGridSizeMeters] = useState(300);
+  const [drawMode, setDrawMode] = useState<'polygon' | 'rectangle' | 'circle' | null>('polygon');
+  const [drawnShape, setDrawnShape] = useState<DrawnShape | null>(null);
+  const [gridCells, setGridCells] = useState<GridCell[]>([]);
+  const [toast, setToast] = useState<{ msg: string; type: 'info' | 'success' | 'error' } | null>(null);
 
-  const drawAPIRef = useRef<{ setDrawMode: (mode: DrawMode) => void; clearDrawings: () => void; getDrawnShape: () => any } | null>(null);
-  const getBoundsRef = useRef<(() => any) | null>(null);
-
+  const drawAPIRef = useRef<MapAPI | null>(null);
   const collection = useCollection();
 
-  useSSE(
-    collection.taskId,
-    collection.onProgress,
-    collection.onComplete,
-    collection.onError,
-  );
+  useSSE(collection.taskId, collection.onProgress, collection.onComplete, collection.onError);
 
-  const estimatedCells = useMemo(() => 0, [mode, gridSize]);
+  const estimatedCells = gridCells.length > 0 ? gridCells.length : 0;
   const estimatedMinutes = useMemo(() => Math.ceil((estimatedCells * 1.2) / 60), [estimatedCells]);
 
-  const disabled = selectedCategories.length === 0 || collection.status === 'running';
+  const showToast = useCallback((msg: string, type: 'info' | 'success' | 'error' = 'info') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2500);
+  }, []);
 
-  const handleDrawReady = useCallback((api: { setDrawMode: (mode: DrawMode) => void; clearDrawings: () => void; getDrawnShape: () => any }) => {
+  // Draw can start when: categories selected + (grid mode OR region with grid split done)
+  const disabled = selectedCategories.length === 0
+    || collection.status === 'running'
+    || (mode === 'region' && gridCells.length === 0);
+
+  const handleMapReady = useCallback((api: MapAPI) => {
     drawAPIRef.current = api;
   }, []);
 
-  const handleMapReady = useCallback((getBounds: () => any) => {
-    getBoundsRef.current = getBounds;
+  const handleShapeChange = useCallback((shape: DrawnShape | null) => {
+    setDrawnShape(shape);
+    setGridCells([]);
+    if (shape) showToast('区域已绘制，请进行网格切分', 'success');
+  }, [showToast]);
+
+  const handleGridChange = useCallback((cells: GridCell[]) => {
+    setGridCells(cells);
   }, []);
 
+  const handleSplitGrid = useCallback(() => {
+    const api = drawAPIRef.current;
+    if (!api || !api.getDrawnShape()) {
+      showToast('请先在地图上绘制区域', 'error');
+      return;
+    }
+    const count = api.splitGrid(gridSizeMeters);
+    if (count > 0) {
+      showToast(`网格切分完成：${count} 个网格单元`, 'success');
+    } else {
+      showToast('网格切分失败，请重试', 'error');
+    }
+  }, [gridSizeMeters, showToast]);
+
   const handleStart = useCallback(() => {
-    const bounds = getBoundsRef.current?.() || {
+    const bounds = drawAPIRef.current?.getBounds() || {
       southwest: { lng: 116.3, lat: 39.8 },
       northeast: { lng: 116.5, lat: 40.0 },
     };
-
-    if (mode === 'region') {
-      const region = drawAPIRef.current?.getDrawnShape();
-      if (!region) {
-        alert('请先在地图上绘制区域');
-        return;
-      }
-    }
 
     collection.start({
       mode,
@@ -71,16 +88,21 @@ function App() {
 
   return (
     <>
-      <MapView onDrawReady={handleDrawReady} onMapReady={handleMapReady}>
+      <MapView onMapReady={handleMapReady} onShapeChange={handleShapeChange} onGridChange={handleGridChange}>
         <ControlPanel
           selectedCategories={selectedCategories}
           onCategoriesChange={setSelectedCategories}
           mode={mode}
           gridSize={gridSize}
+          gridSizeMeters={gridSizeMeters}
           estimatedCells={estimatedCells}
           estimatedMinutes={estimatedMinutes}
+          drawnShape={drawnShape}
+          gridCells={gridCells}
           onModeChange={setMode}
           onGridSizeChange={setGridSize}
+          onGridSizeMetersChange={setGridSizeMeters}
+          onSplitGrid={handleSplitGrid}
           onStart={handleStart}
           disabled={disabled}
         />
@@ -89,7 +111,7 @@ function App() {
           <DrawToolbar
             activeMode={drawMode}
             onModeChange={setDrawMode}
-            onClear={() => setDrawMode(null)}
+            onClear={() => { drawAPIRef.current?.clearDrawings(); setDrawMode(null); setDrawnShape(null); setGridCells([]); }}
             setDrawMode={(m) => drawAPIRef.current?.setDrawMode(m)}
           />
         )}
@@ -107,6 +129,21 @@ function App() {
           onExport={handleExport}
         />
       </MapView>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9999, padding: '8px 20px', borderRadius: 20,
+          fontSize: 13, fontWeight: 600, color: '#fff',
+          background: toast.type === 'error' ? '#ef4444' : toast.type === 'success' ? '#22c55e' : '#1e293b',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+          animation: 'fadeInDown 0.3s ease',
+          pointerEvents: 'none',
+        }}>
+          {toast.msg}
+        </div>
+      )}
     </>
   );
 }
