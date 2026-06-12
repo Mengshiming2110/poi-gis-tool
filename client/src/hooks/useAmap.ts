@@ -42,43 +42,50 @@ export function useAmap(containerId: string) {
           resizeEnable: true,
         });
 
-        // MouseTool
-        const mouseTool = new AMap.MouseTool(instance);
-        mouseToolRef.current = mouseTool;
-
-        mouseTool.on('draw', (event: any) => {
-          const { obj } = event;
-          const mode = currentDrawModeRef.current;
-          let shapeInfo: DrawnShape | null = null;
-
-          if (mode === 'polygon' && obj instanceof AMap.Polygon) {
-            const path = obj.getPath().map((p: any) => [p.lng, p.lat]);
-            shapeInfo = { type: 'polygon', geometry: path, overlay: obj };
-          } else if (mode === 'rectangle' && obj instanceof AMap.Rectangle) {
-            const bounds = obj.getBounds();
-            const sw = [bounds.getSouthWest().lng, bounds.getSouthWest().lat];
-            const ne = [bounds.getNorthEast().lng, bounds.getNorthEast().lat];
-            const rectPath = [sw, [ne[0], sw[1]], ne, [sw[0], ne[1]]];
-            shapeInfo = { type: 'rectangle', geometry: { bounds: [sw, ne], path: rectPath }, overlay: obj };
-          } else if (mode === 'circle' && obj instanceof AMap.Circle) {
-            const center = obj.getCenter();
-            const radius = obj.getRadius();
-            shapeInfo = { type: 'circle', geometry: { center: [center.lng, center.lat], radius }, overlay: obj };
-          }
-
-          if (shapeInfo) {
-            // Remove old shape
-            if (drawnShapeRef.current?.overlay) {
-              try { instance.remove(drawnShapeRef.current.overlay); } catch (e) {}
-            }
-            drawnShapeRef.current = shapeInfo;
-          }
-          mouseTool.close(true);
-        });
-
         mapRef.current = instance;
         setMap(instance);
-        setLoaded(true);
+
+        // Load plugins via native AMap.plugin()
+        AMap.plugin(['AMap.MouseTool', 'AMap.Geolocation', 'AMap.PlaceSearch', 'AMap.Scale', 'AMap.ToolBar'], () => {
+          if (destroyed) return;
+
+          instance.addControl(new AMap.Scale({ position: 'LB' }));
+          instance.addControl(new AMap.ToolBar({ position: 'RT' }));
+
+          const mouseTool = new AMap.MouseTool(instance);
+          mouseToolRef.current = mouseTool;
+
+          mouseTool.on('draw', (event: any) => {
+            const { obj } = event;
+            const mode = currentDrawModeRef.current;
+            let shapeInfo: DrawnShape | null = null;
+
+            if (mode === 'polygon' && obj instanceof AMap.Polygon) {
+              const path = obj.getPath().map((p: any) => [p.lng, p.lat]);
+              shapeInfo = { type: 'polygon', geometry: path, overlay: obj };
+            } else if (mode === 'rectangle' && obj instanceof AMap.Rectangle) {
+              const bounds = obj.getBounds();
+              const sw = [bounds.getSouthWest().lng, bounds.getSouthWest().lat];
+              const ne = [bounds.getNorthEast().lng, bounds.getNorthEast().lat];
+              const rectPath = [sw, [ne[0], sw[1]], ne, [sw[0], ne[1]]];
+              shapeInfo = { type: 'rectangle', geometry: { bounds: [sw, ne], path: rectPath }, overlay: obj };
+            } else if (mode === 'circle' && obj instanceof AMap.Circle) {
+              const center = obj.getCenter();
+              const radius = obj.getRadius();
+              shapeInfo = { type: 'circle', geometry: { center: [center.lng, center.lat], radius }, overlay: obj };
+            }
+
+            if (shapeInfo) {
+              if (drawnShapeRef.current?.overlay) {
+                try { instance.remove(drawnShapeRef.current.overlay); } catch (e) {}
+              }
+              drawnShapeRef.current = shapeInfo;
+            }
+            mouseTool.close(true);
+          });
+
+          setLoaded(true);
+        });
       })
       .catch((err: any) => console.error('高德地图加载失败:', err));
 
