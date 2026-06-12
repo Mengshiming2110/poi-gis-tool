@@ -268,8 +268,11 @@ export function useAmap(containerId: string) {
         try {
           const results = await new Promise<any[]>((resolve) => {
             ps.setType(catCode);
-            ps.searchNearBy('', [cell.center[0], cell.center[1]], Math.max(gridSizeMeters * 0.75, 150),
+            const radius = Math.max(gridSizeMeters * 0.75, 150);
+            console.log(`[PlaceSearch] 搜索: cat=${catCode} center=${cell.center} radius=${radius}`);
+            ps.searchNearBy('', [cell.center[0], cell.center[1]], radius,
               (status: string, result: any) => {
+                console.log(`[PlaceSearch] 回调: status=${status} hasPois=${!!result?.poiInfo?.pois} count=${result?.poiInfo?.pois?.length || 0}`, result?.info || '');
                 if (status === 'complete' && result?.poiInfo?.pois) resolve(result.poiInfo.pois);
                 else resolve([]);
               }
