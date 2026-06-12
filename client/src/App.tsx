@@ -15,7 +15,7 @@ function App() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [mode, setMode] = useState<TaskMode>('region');
   const [gridSize, setGridSize] = useState(0.01);
-  const [gridSizeMeters, setGridSizeMeters] = useState(300);
+  const [gridSizeMeters, setGridSizeMeters] = useState(500);
   const [drawMode, setDrawMode] = useState<'polygon' | 'rectangle' | 'circle' | null>('polygon');
   const [drawnShape, setDrawnShape] = useState<DrawnShape | null>(null);
   const [gridCells, setGridCells] = useState<GridCell[]>([]);

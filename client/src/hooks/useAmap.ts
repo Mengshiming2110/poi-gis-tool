@@ -51,7 +51,7 @@ export function useAmap(containerId: string) {
         const AMap = window.AMap;
         const instance = new AMap.Map(containerId, {
           zoom: 12,
-          center: [116.397428, 39.90923],
+          center: [116.397428, 39.90923], // fallback
           viewMode: '2D',
           resizeEnable: true,
         });
@@ -103,6 +103,15 @@ export function useAmap(containerId: string) {
         mapRef.current = instance;
         setMap(instance);
         setLoaded(true);
+
+        // Auto-locate on first load
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => { instance.setZoomAndCenter(15, [pos.coords.longitude, pos.coords.latitude]); },
+            () => {},
+            { timeout: 5000, enableHighAccuracy: true }
+          );
+        }
         return;
       }
 
