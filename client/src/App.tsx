@@ -8,7 +8,7 @@ import { useCollection } from './hooks/useCollection';
 import { useSSE } from './hooks/useSSE';
 import { getExportUrl } from './services/api';
 import type { TaskMode } from './types/poi';
-import type { DrawAPI } from './components/MapView';
+import type { DrawMode } from './components/MapView';
 import './App.css';
 
 function App() {
@@ -17,7 +17,7 @@ function App() {
   const [gridSize, setGridSize] = useState(0.01);
   const [drawMode, setDrawMode] = useState<'polygon' | 'rectangle' | 'circle' | null>(null);
 
-  const drawAPIRef = useRef<DrawAPI | null>(null);
+  const drawAPIRef = useRef<{ setDrawMode: (mode: DrawMode) => void; clearDrawings: () => void; getDrawnShape: () => any } | null>(null);
   const getBoundsRef = useRef<(() => any) | null>(null);
 
   const collection = useCollection();
@@ -34,7 +34,7 @@ function App() {
 
   const disabled = selectedCategories.length === 0 || collection.status === 'running';
 
-  const handleDrawReady = useCallback((api: DrawAPI) => {
+  const handleDrawReady = useCallback((api: { setDrawMode: (mode: DrawMode) => void; clearDrawings: () => void; getDrawnShape: () => any }) => {
     drawAPIRef.current = api;
   }, []);
 
@@ -49,7 +49,7 @@ function App() {
     };
 
     if (mode === 'region') {
-      const region = drawAPIRef.current?.getDrawnRegion();
+      const region = drawAPIRef.current?.getDrawnShape();
       if (!region) {
         alert('请先在地图上绘制区域');
         return;
@@ -90,7 +90,7 @@ function App() {
             activeMode={drawMode}
             onModeChange={setDrawMode}
             onClear={() => setDrawMode(null)}
-            drawAPI={drawAPIRef.current}
+            setDrawMode={(m) => drawAPIRef.current?.setDrawMode(m)}
           />
         )}
 

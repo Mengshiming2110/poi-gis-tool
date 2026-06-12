@@ -1,35 +1,22 @@
 import { Polygon, Square, Circle, Trash } from '@phosphor-icons/react';
-import type { DrawAPI } from './MapView';
-
-type DrawMode = 'polygon' | 'rectangle' | 'circle' | null;
+import type { DrawMode } from './MapView';
 
 interface DrawToolbarProps {
   activeMode: DrawMode;
   onModeChange: (mode: DrawMode) => void;
   onClear: () => void;
-  drawAPI: DrawAPI | null;
+  setDrawMode: ((mode: DrawMode) => void) | null;
 }
 
-function DrawToolbar({ activeMode, onModeChange, onClear, drawAPI }: DrawToolbarProps) {
+function DrawToolbar({ activeMode, onModeChange, onClear, setDrawMode }: DrawToolbarProps) {
   const activateMode = (mode: 'polygon' | 'rectangle' | 'circle') => {
     if (activeMode === mode) {
-      // Deactivate
-      drawAPI?.stopDraw();
+      setDrawMode?.(null);
       onModeChange(null);
     } else {
-      // Activate
-      drawAPI?.stopDraw(); // stop any previous
+      setDrawMode?.(mode);
       onModeChange(mode);
-      const cb = () => {};
-      if (mode === 'polygon') drawAPI?.startPolygon(cb);
-      else if (mode === 'rectangle') drawAPI?.startRectangle(cb);
-      else if (mode === 'circle') drawAPI?.startCircle(cb);
     }
-  };
-
-  const handleClear = () => {
-    drawAPI?.clearDrawings();
-    onClear();
   };
 
   const btnStyle = (mode: DrawMode): React.CSSProperties => ({
@@ -45,20 +32,17 @@ function DrawToolbar({ activeMode, onModeChange, onClear, drawAPI }: DrawToolbar
       display: 'flex', gap: 4, background: 'rgba(255,255,255,0.95)',
       borderRadius: 8, padding: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
     }}>
-      <button type="button" style={btnStyle('polygon')}
-        onClick={() => activateMode('polygon')} title="多边形">
+      <button type="button" style={btnStyle('polygon')} onClick={() => activateMode('polygon')} title="多边形">
         <Polygon size={18} />
       </button>
-      <button type="button" style={btnStyle('rectangle')}
-        onClick={() => activateMode('rectangle')} title="矩形">
+      <button type="button" style={btnStyle('rectangle')} onClick={() => activateMode('rectangle')} title="矩形">
         <Square size={18} />
       </button>
-      <button type="button" style={btnStyle('circle')}
-        onClick={() => activateMode('circle')} title="圆形">
+      <button type="button" style={btnStyle('circle')} onClick={() => activateMode('circle')} title="圆形">
         <Circle size={18} />
       </button>
       <div style={{ width: 1, background: '#e2e8f0', margin: '4px 2px' }} />
-      <button type="button" style={{ ...btnStyle(null), color: '#ef4444' }} onClick={handleClear} title="清除">
+      <button type="button" style={{ ...btnStyle(null), color: '#ef4444' }} onClick={() => { setDrawMode?.(null); onClear(); }} title="清除">
         <Trash size={18} />
       </button>
     </div>
