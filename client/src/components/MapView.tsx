@@ -20,6 +20,10 @@ export interface MapAPI {
   drawMode: DrawMode;
   drawnShape: DrawnShape | null;
   gridCells: GridCell[];
+  collectPOIsClientSide: (cells: GridCell[], categories: string[], categoryNames: Record<string, string>, gridSizeMeters: number, onCellProgress: (done: number, total: number) => void) => Promise<any[]>;
+  stopCollecting: () => void;
+  poiData: any[];
+  isCollecting: boolean;
 }
 
 function MapView({ children, onMapReady, onShapeChange, onGridChange }: MapViewProps) {
@@ -39,6 +43,10 @@ function MapView({ children, onMapReady, onShapeChange, onGridChange }: MapViewP
           drawMode: amap.drawMode,
           drawnShape: amap.drawnShape,
           gridCells: amap.gridCells,
+          collectPOIsClientSide: amap.collectPOIsClientSide,
+          stopCollecting: amap.stopCollecting,
+          poiData: amap.poiData,
+          isCollecting: amap.isCollecting,
         });
       }
     }

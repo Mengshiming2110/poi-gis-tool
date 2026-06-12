@@ -26,6 +26,7 @@ function getConfig() {
 export function useAmap(containerId: string) {
   const mapRef = useRef<any>(null);
   const mouseToolRef = useRef<any>(null);
+  const placeSearchRef = useRef<any>(null);
   const drawnShapeRef = useRef<DrawnShape | null>(null);
   const gridOverlaysRef = useRef<any[]>([]);
   const poiMarkersRef = useRef<any[]>([]);
@@ -34,6 +35,9 @@ export function useAmap(containerId: string) {
   const [drawMode, setDrawModeState] = useState<DrawMode>(null);
   const [drawnShape, setDrawnShape] = useState<DrawnShape | null>(null);
   const [gridCells, setGridCells] = useState<GridCell[]>([]);
+  const [poiData, setPoiData] = useState<any[]>([]);
+  const [isCollecting, setIsCollecting] = useState(false);
+  const collectingRef = useRef(false);
 
   // Poll until window.AMap is available, then init
   useEffect(() => {
@@ -92,6 +96,9 @@ export function useAmap(containerId: string) {
           }
           mouseTool.close(true);
         });
+
+        const placeSearch = new AMap.PlaceSearch({ pageSize: 25, pageIndex: 1 });
+        placeSearchRef.current = placeSearch;
 
         mapRef.current = instance;
         setMap(instance);
@@ -235,8 +242,77 @@ export function useAmap(containerId: string) {
     );
   }, []);
 
+  // Client-side POI collection using PlaceSearch (temp, avoids REST API quota)
+  const collectPOIsClientSide = useCallback(async (
+    cells: GridCell[],
+    categories: string[],
+    categoryNames: Record<string, string>,
+    gridSizeMeters: number,
+    onCellProgress: (done: number, total: number) => void,
+  ): Promise<any[]> => {
+    const ps = placeSearchRef.current;
+    if (!ps || cells.length === 0) return [];
+
+    setIsCollecting(true);
+    collectingRef.current = true;
+    setPoiData([]);
+    const allPois: any[] = [];
+    const seen = new Set<string>();
+    const totalTasks = cells.length * categories.length;
+    let done = 0;
+
+    for (const cell of cells) {
+      if (!collectingRef.current) break;
+      for (const catCode of categories) {
+        if (!collectingRef.current) break;
+        try {
+          const results = await new Promise<any[]>((resolve) => {
+            ps.setType(catCode);
+            ps.searchNearBy('', [cell.center[0], cell.center[1]], Math.max(gridSizeMeters * 0.75, 150),
+              (status: string, result: any) => {
+                if (status === 'complete' && result?.poiInfo?.pois) resolve(result.poiInfo.pois);
+                else resolve([]);
+              }
+            );
+          });
+          results.forEach((poi: any) => {
+            const key = poi.id || `${poi.name}_${poi.location?.lng?.toFixed(5)}_${poi.location?.lat?.toFixed(5)}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              allPois.push({
+                id: poi.id || '',
+                name: poi.name || '未知',
+                category: categoryNames[catCode] || catCode,
+                subcategory: poi.type?.split(';')[0] || '',
+                address: poi.address || '',
+                lng: poi.location?.lng || cell.center[0],
+                lat: poi.location?.lat || cell.center[1],
+                phone: poi.tel || '',
+              });
+            }
+          });
+        } catch (e) { console.warn('搜索出错:', e); }
+        done++;
+        onCellProgress(done, totalTasks);
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+
+    setPoiData(allPois);
+    setIsCollecting(false);
+    collectingRef.current = false;
+    console.log(`[Client] 采集完成: ${allPois.length} 条POI`);
+    return allPois;
+  }, []);
+
+  const stopCollecting = useCallback(() => {
+    collectingRef.current = false;
+    setIsCollecting(false);
+  }, []);
+
   return { map, loaded, getBounds, setDrawMode, clearDrawings, getDrawnShape, splitGrid,
-           drawMode, drawnShape, gridCells, locateMe };
+           drawMode, drawnShape, gridCells, locateMe, collectPOIsClientSide, stopCollecting,
+           poiData, isCollecting };
 }
 
 // --- Geometry helpers ---
