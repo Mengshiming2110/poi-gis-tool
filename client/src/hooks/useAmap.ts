@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import AMapLoader from '@amap/amap-jsapi-loader';
 
-// NOTE: Replace with your actual Amap JS API Key
-const AMAP_KEY = 'YOUR_AMAP_KEY';
+const AMAP_KEY = '35f0e1144644fbfba405c109db466cdc';
+const AMAP_SECURITY_CODE = '8d13a7d3f6ecff69f02dc1dea5855b0a';
 const AMAP_VERSION = '2.0';
+
+// 高德 JS API 2.0 安全密钥配置
+window._AMapSecurityConfig = {
+  securityJsCode: AMAP_SECURITY_CODE,
+};
 
 export function useAmap(containerId: string) {
   const mapRef = useRef<any>(null);
