@@ -1,0 +1,164 @@
+import { v4 as uuid } from 'uuid';
+import { collectCellWithRetry } from './services/amap';
+import { generateGrid, filterCellsByPolygon, estimateTime } from './services/grid';
+import { createTask, updateTaskStatus, incrementTaskProgress, insertPois, getTask } from './db';
+import { config } from './config';
+import type { CollectRequest, GridCell, AmapPoiItem, TaskStatus } from './types';
+
+interface ActiveTask {
+  id: string;
+  cells: GridCell[];
+  currentIndex: number;
+  status: TaskStatus;
+  categories: string[];
+  onProgress: (data: any) => void;
+  onComplete: (data: any) => void;
+}
+
+const activeTasks = new Map<string, ActiveTask>();
+
+const CATEGORY_MAP: Record<string, string> = {
+  '050000': '餐饮美食', '060000': '购物消费', '070000': '生活服务',
+  '080000': '医疗保健', '100000': '酒店住宿', '110000': '旅游景点',
+  '140000': '交通设施', '150000': '教育培训', '160000': '金融服务',
+  '120000': '公司企业', '130000': '政府机构', '010000': '汽车服务',
+  '180000': '体育休闲',
+};
+
+function mapCategory(typecode: string): string {
+  // typecode format: "050100|050101" — take the second part's first 6 chars
+  const parts = typecode.split('|');
+  if (parts.length > 1) {
+    const code = parts[1].slice(0, 6);
+    return CATEGORY_MAP[code] || code;
+  }
+  return '';
+}
+
+function mapSubcategory(typeStr: string): string {
+  // type format: "餐饮服务;中餐厅;中餐厅"
+  const parts = typeStr.split(';');
+  return parts.length > 1 ? parts[1] : (parts[0] || '');
+}
+
+export function startCollection(
+  req: CollectRequest,
+  onProgress: (data: any) => void,
+  onComplete: (data: any) => void
+): { taskId: string; totalCells: number; estimatedMinutes: number } {
+  const taskId = uuid();
+  let cells = generateGrid(req.bounds, req.gridSize || 0.01);
+
+  if (req.mode === 'region' && req.region) {
+    cells = filterCellsByPolygon(cells, req.region);
+  }
+
+  createTask({
+    id: taskId,
+    mode: req.mode,
+    categories: JSON.stringify(req.categories),
+    grid_size: req.gridSize || null,
+    region_geo: req.region ? JSON.stringify(req.region) : null,
+    status: 'running',
+    total_cells: cells.length,
+    done_cells: 0,
+    total_pois: 0,
+  });
+
+  const task: ActiveTask = {
+    id: taskId,
+    cells,
+    currentIndex: 0,
+    status: 'running',
+    categories: req.categories,
+    onProgress,
+    onComplete,
+  };
+
+  activeTasks.set(taskId, task);
+  processNextCell(taskId);
+
+  return {
+    taskId,
+    totalCells: cells.length,
+    estimatedMinutes: estimateTime(cells.length),
+  };
+}
+
+async function processNextCell(taskId: string): Promise<void> {
+  const task = activeTasks.get(taskId);
+  if (!task || task.status !== 'running') return;
+
+  if (task.currentIndex >= task.cells.length) {
+    updateTaskStatus(taskId, 'done');
+    task.status = 'done';
+    const t = getTask(taskId);
+    task.onComplete({ taskId, totalPois: t?.total_pois || 0 });
+    activeTasks.delete(taskId);
+    return;
+  }
+
+  const cell = task.cells[task.currentIndex];
+  const pois: AmapPoiItem[] = await collectCellWithRetry(cell, task.categories);
+
+  if (pois.length > 0) {
+    insertPois(taskId, pois.map(p => {
+      const parts = (p.typecode || '').split('|');
+      const code = parts.length > 1 ? parts[1].slice(0, 6) : '';
+      return {
+        name: p.name,
+        category: CATEGORY_MAP[code] || code,
+        subcategory: mapSubcategory(p.type || ''),
+        address: p.address || '',
+        lng: parseFloat(p.location.split(',')[0]),
+        lat: parseFloat(p.location.split(',')[1]),
+        phone: p.tel || '',
+        rating: p.biz_ext?.rating ? parseFloat(p.biz_ext.rating) : null,
+      };
+    }));
+  }
+
+  incrementTaskProgress(taskId, pois.length);
+  task.currentIndex++;
+
+  const t = getTask(taskId);
+  task.onProgress({
+    doneCells: task.currentIndex,
+    totalCells: task.cells.length,
+    totalPois: t?.total_pois || 0,
+  });
+
+  await sleep(config.requestDelay);
+  // Use setImmediate or setTimeout to avoid stack overflow from recursion
+  setImmediate(() => processNextCell(taskId));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export function pauseCollection(taskId: string): void {
+  const task = activeTasks.get(taskId);
+  if (task) {
+    task.status = 'paused';
+    updateTaskStatus(taskId, 'paused');
+  }
+}
+
+export function resumeCollection(taskId: string): void {
+  const task = activeTasks.get(taskId);
+  if (task && task.status === 'paused') {
+    task.status = 'running';
+    updateTaskStatus(taskId, 'running');
+    processNextCell(taskId);
+  }
+}
+
+export function cancelCollection(taskId: string): void {
+  const task = activeTasks.get(taskId);
+  if (task) {
+    task.status = 'cancelled';
+    updateTaskStatus(taskId, 'cancelled');
+    activeTasks.delete(taskId);
+  }
+}
