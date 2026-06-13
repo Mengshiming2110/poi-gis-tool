@@ -1,6 +1,6 @@
 const REPO_OWNER = 'Mengshiming2110';
 const REPO_NAME = 'poi-gis-tool';
-const CURRENT_VERSION = '1.0.0';
+const CURRENT_VERSION = '1.0.1';
 
 interface Release {
   tag: string;
