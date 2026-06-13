@@ -15,6 +15,12 @@ export interface GridCell {
   bounds: [[number, number], [number, number]];
 }
 
+interface CachedPoiResult {
+  pois: any[];
+  total: number;
+  savedAt: number;
+}
+
 // Config from localStorage, fallback to defaults
 function getConfig() {
   return {
@@ -423,6 +429,9 @@ export function useAmap(containerId: string) {
     const REST_KEY = localStorage.getItem('amap_rest_key') || '125c253ac5c0c03f9165bc3c721d130f';
     const PAGE_SIZE = 25;
     const REQUEST_DELAY_MS = 500;
+    const MAX_PAGES_PER_QUERY = Number(localStorage.getItem('amap_max_pages_per_query') || '2');
+    const DENSE_SPLIT_THRESHOLD = Number(localStorage.getItem('amap_dense_split_threshold') || '80');
+    const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
     setIsCollecting(true);
     collectingRef.current = true;
@@ -433,6 +442,14 @@ export function useAmap(containerId: string) {
     let done = 0;
     let firstError: string | null = null;
 
+    const quotaBlocked = getQuotaBlockMessage(REST_KEY);
+    if (quotaBlocked) {
+      setPoiData([]);
+      setIsCollecting(false);
+      collectingRef.current = false;
+      throw new Error(quotaBlocked);
+    }
+
     outer:
     for (const cell of cells) {
       if (!collectingRef.current) break;
@@ -440,42 +457,60 @@ export function useAmap(containerId: string) {
         if (!collectingRef.current) break;
         try {
           const radius = Math.max(gridSizeMeters * 0.75, 150);
+          const cacheKey = buildPoiCacheKey(catCode, cell.center, radius);
+          const cached = readPoiCache(cacheKey, CACHE_TTL_MS);
 
-          // Fetch page 1
-          const { pois: page1, total: count } = await fetchAmapPOIs(
-            REST_KEY, cell.center, radius, catCode, 1, PAGE_SIZE,
-          );
-          await delay(REQUEST_DELAY_MS);
+          if (cached) {
+            mergePois(allPois, seen, cached.pois, categoryNames[catCode] || catCode);
+          } else {
+            const collectedForQuery: any[] = [];
 
-          page1.forEach((poi: any) => {
-            const key = poi.id || `${poi.name}_${poi.lng?.toFixed(5)}_${poi.lat?.toFixed(5)}`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              allPois.push({ ...poi, category: categoryNames[catCode] || catCode });
-            }
-          });
-
-          // Fetch remaining pages
-          const pages = Math.ceil(count / PAGE_SIZE);
-          for (let p = 2; p <= Math.min(pages, 4); p++) {
-            if (!collectingRef.current) break;
-            const { pois: pagePois } = await fetchAmapPOIs(
-              REST_KEY, cell.center, radius, catCode, p, PAGE_SIZE,
+            // Fetch page 1 as a probe. Only fetch more when density suggests it is worth it.
+            const { pois: page1, total: count } = await fetchAmapPOIs(
+              REST_KEY, cell.center, radius, catCode, 1, PAGE_SIZE,
             );
             await delay(REQUEST_DELAY_MS);
-            pagePois.forEach((poi: any) => {
-              const key = poi.id || `${poi.name}_${poi.lng?.toFixed(5)}_${poi.lat?.toFixed(5)}`;
-              if (!seen.has(key)) {
-                seen.add(key);
-                allPois.push({ ...poi, category: categoryNames[catCode] || catCode });
+            collectedForQuery.push(...page1);
+
+            if (count > DENSE_SPLIT_THRESHOLD && gridSizeMeters >= 300) {
+              const subCells = splitCell(cell);
+              for (const subCell of subCells) {
+                if (!collectingRef.current) break;
+                const subRadius = Math.max(gridSizeMeters * 0.35, 120);
+                const subCacheKey = buildPoiCacheKey(catCode, subCell.center, subRadius);
+                const subCached = readPoiCache(subCacheKey, CACHE_TTL_MS);
+                if (subCached) {
+                  collectedForQuery.push(...subCached.pois);
+                  continue;
+                }
+                const { pois: subPois, total: subTotal } = await fetchAmapPOIs(
+                  REST_KEY, subCell.center, subRadius, catCode, 1, PAGE_SIZE,
+                );
+                await delay(REQUEST_DELAY_MS);
+                collectedForQuery.push(...subPois);
+                writePoiCache(subCacheKey, { pois: subPois, total: subTotal, savedAt: Date.now() });
               }
-            });
+            } else {
+              const pages = Math.ceil(count / PAGE_SIZE);
+              for (let p = 2; p <= Math.min(pages, MAX_PAGES_PER_QUERY); p++) {
+                if (!collectingRef.current) break;
+                const { pois: pagePois } = await fetchAmapPOIs(
+                  REST_KEY, cell.center, radius, catCode, p, PAGE_SIZE,
+                );
+                await delay(REQUEST_DELAY_MS);
+                collectedForQuery.push(...pagePois);
+              }
+            }
+
+            writePoiCache(cacheKey, { pois: collectedForQuery, total: count, savedAt: Date.now() });
+            mergePois(allPois, seen, collectedForQuery, categoryNames[catCode] || catCode);
           }
         } catch (e: any) {
           console.warn('[REST] 搜索出错:', e);
           const message = e?.message || String(e);
           if (!firstError) firstError = message;
           if (isFatalAmapError(message)) {
+            rememberQuotaBlock(message, REST_KEY);
             done++;
             onCellProgress(done, totalTasks, allPois.length);
             break outer;
@@ -507,6 +542,16 @@ export function useAmap(containerId: string) {
   return { map, loaded, getBounds, setDrawMode, clearDrawings, getDrawnShape, splitGrid,
            drawMode, drawnShape, gridCells, locateMe, collectPOIsClientSide, stopCollecting,
            poiData, isCollecting };
+}
+
+function mergePois(target: any[], seen: Set<string>, pois: any[], category: string) {
+  pois.forEach((poi: any) => {
+    const key = poi.id || `${poi.name}_${poi.lng?.toFixed(5)}_${poi.lat?.toFixed(5)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      target.push({ ...poi, category });
+    }
+  });
 }
 
 // --- Geometry helpers ---
@@ -598,6 +643,75 @@ function isFatalAmapError(message: string): boolean {
     message.includes('10044') ||
     message.includes('10009') ||
     message.includes('10001');
+}
+
+function getTodayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getQuotaBlockMessage(currentKey: string): string | null {
+  const blockedDay = localStorage.getItem('amap_quota_block_day');
+  const blockedKey = localStorage.getItem('amap_quota_block_key');
+  const message = localStorage.getItem('amap_quota_block_message');
+  if (blockedDay === getTodayKey() && blockedKey === currentKey) {
+    return message || '高德 Web服务 Key 今日配额已用完，请明天再采集或更换 Web服务 Key';
+  }
+  return null;
+}
+
+function rememberQuotaBlock(message: string, key: string) {
+  if (!message.includes('配额已用完') && !message.includes('10044')) return;
+  localStorage.setItem('amap_quota_block_day', getTodayKey());
+  localStorage.setItem('amap_quota_block_key', key);
+  localStorage.setItem('amap_quota_block_message', message);
+}
+
+function buildPoiCacheKey(category: string, center: [number, number], radius: number): string {
+  const lng = center[0].toFixed(5);
+  const lat = center[1].toFixed(5);
+  return `poi-cache:v1:${category}:${lng}:${lat}:${Math.round(radius)}`;
+}
+
+function readPoiCache(key: string, ttlMs: number): CachedPoiResult | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedPoiResult;
+    if (!parsed.savedAt || Date.now() - parsed.savedAt > ttlMs) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return parsed;
+  } catch {
+    localStorage.removeItem(key);
+    return null;
+  }
+}
+
+function writePoiCache(key: string, value: CachedPoiResult) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Mobile WebView storage can fill up; cache is an optimization, not required data.
+  }
+}
+
+function splitCell(cell: GridCell): GridCell[] {
+  const midLng = (cell.sw[0] + cell.ne[0]) / 2;
+  const midLat = (cell.sw[1] + cell.ne[1]) / 2;
+  const ranges: Array<[[number, number], [number, number]]> = [
+    [cell.sw, [midLng, midLat]],
+    [[midLng, cell.sw[1]], [cell.ne[0], midLat]],
+    [[cell.sw[0], midLat], [midLng, cell.ne[1]]],
+    [[midLng, midLat], cell.ne],
+  ];
+
+  return ranges.map(([sw, ne]) => ({
+    sw,
+    ne,
+    center: [(sw[0] + ne[0]) / 2, (sw[1] + ne[1]) / 2],
+    bounds: [sw, ne],
+  }));
 }
 
 function generateGridCells(bounds: [[number, number], [number, number]], gridSizeMeters: number): GridCell[] {

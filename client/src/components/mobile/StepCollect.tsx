@@ -5,6 +5,20 @@ import { CATEGORY_LIST as CATS } from '../../types/poi';
 const CATEGORY_NAMES: Record<string, string> = {};
 CATS.forEach(c => { CATEGORY_NAMES[c.code] = c.name; });
 
+function getTodayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getQuotaBlockMessage(): string | null {
+  const currentKey = localStorage.getItem('amap_rest_key') || '125c253ac5c0c03f9165bc3c721d130f';
+  const blockedDay = localStorage.getItem('amap_quota_block_day');
+  const blockedKey = localStorage.getItem('amap_quota_block_key');
+  const message = localStorage.getItem('amap_quota_block_message');
+  return blockedDay === getTodayKey() && blockedKey === currentKey
+    ? message || '高德 Web服务 Key 今日配额已用完，请明天再采集或更换 Web服务 Key'
+    : null;
+}
+
 interface Props {
   categories: string[];
   gridCells: GridCell[];
@@ -27,12 +41,18 @@ function StepCollect({ categories, gridCells, collectPOIsClientSide, stopCollect
   const [poiCount, setPoiCount] = useState(0);
   const [status, setStatus] = useState<'running' | 'done'>('running');
   const [stopping, setStopping] = useState(false);
+  const estimatedRequests = gridCells.length * categories.length * Number(localStorage.getItem('amap_max_pages_per_query') || '2');
 
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
       try {
+        const quotaMessage = getQuotaBlockMessage();
+        if (quotaMessage) {
+          throw new Error(quotaMessage);
+        }
+
         // Estimate grid cell size from first cell
         const c0 = gridCells[0];
         const gridSizeMeters = c0
@@ -115,6 +135,10 @@ function StepCollect({ categories, gridCells, collectPOIsClientSide, stopCollect
         <span style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
           {status === 'done' ? '采集完成' : '采集中...'}
         </span>
+      </div>
+
+      <div style={{ marginTop: 12, color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
+        预计最多调用高德 {estimatedRequests} 次；已缓存网格会自动跳过
       </div>
 
       <div style={{ display: 'flex', gap: 40, marginTop: 32 }}>
