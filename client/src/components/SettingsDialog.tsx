@@ -41,11 +41,24 @@ function SettingsDialog() {
   }, [open]);
 
   const handleSave = useCallback(() => {
-    localStorage.setItem(STORAGE_KEYS.jsKey, jsKey);
-    localStorage.setItem(STORAGE_KEYS.securityCode, securityCode);
-    localStorage.setItem(STORAGE_KEYS.wsKey, wsKey);
+    const nextJsKey = jsKey.trim();
+    const nextSecurityCode = securityCode.trim();
+    const nextWsKey = wsKey.trim();
 
-    const newVal = JSON.stringify({ jsKey, securityCode, wsKey });
+    if (nextJsKey) localStorage.setItem(STORAGE_KEYS.jsKey, nextJsKey);
+    else localStorage.removeItem(STORAGE_KEYS.jsKey);
+
+    if (nextSecurityCode) localStorage.setItem(STORAGE_KEYS.securityCode, nextSecurityCode);
+    else localStorage.removeItem(STORAGE_KEYS.securityCode);
+
+    if (nextWsKey) localStorage.setItem(STORAGE_KEYS.wsKey, nextWsKey);
+    else localStorage.removeItem(STORAGE_KEYS.wsKey);
+
+    localStorage.removeItem('amap_quota_block_day');
+    localStorage.removeItem('amap_quota_block_key');
+    localStorage.removeItem('amap_quota_block_message');
+
+    const newVal = JSON.stringify({ jsKey: nextJsKey, securityCode: nextSecurityCode, wsKey: nextWsKey });
     if (initialRef.current !== null && initialRef.current !== newVal) {
       setChanged(true);
     }

@@ -10,7 +10,7 @@ function getTodayKey(): string {
 }
 
 function getQuotaBlockMessage(): string | null {
-  const currentKey = localStorage.getItem('amap_rest_key') || '125c253ac5c0c03f9165bc3c721d130f';
+  const currentKey = (localStorage.getItem('amap_rest_key') || '').trim();
   const blockedDay = localStorage.getItem('amap_quota_block_day');
   const blockedKey = localStorage.getItem('amap_quota_block_key');
   const message = localStorage.getItem('amap_quota_block_message');

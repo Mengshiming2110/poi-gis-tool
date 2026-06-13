@@ -19,6 +19,7 @@ export interface CollectRequest {
   bounds: Bounds;
   gridSize?: number;
   region?: GeoJSON.Polygon;
+  amapKey?: string;
 }
 
 export interface Task {

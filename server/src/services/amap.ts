@@ -36,13 +36,14 @@ async function sleep(ms: number): Promise<void> {
 export async function searchPoiInCell(
   cell: GridCell,
   categories: string[],
-  page: number = 1
+  page: number = 1,
+  amapKey: string = config.amapKey
 ): Promise<AmapSearchResponse> {
   const polygon = `${cell.sw.lng},${cell.sw.lat}|${cell.ne.lng},${cell.ne.lat}`;
   const types = categories.join('|');
 
   const params = new URLSearchParams({
-    key: config.amapKey,
+    key: amapKey,
     polygon,
     types,
     offset: '25',
@@ -64,13 +65,14 @@ export async function searchPoiInCell(
 
 export async function collectCellPois(
   cell: GridCell,
-  categories: string[]
+  categories: string[],
+  amapKey?: string
 ): Promise<AmapPoiItem[]> {
   const allPois: AmapPoiItem[] = [];
   let page = 1;
 
   while (true) {
-    const result = await searchPoiInCell(cell, categories, page);
+    const result = await searchPoiInCell(cell, categories, page, amapKey || config.amapKey);
 
     if (result.status !== '1') {
       throw new AmapApiError(formatAmapError(result.info, result.infocode), result.info, result.infocode, true);
@@ -92,11 +94,12 @@ export async function collectCellPois(
 
 export async function collectCellWithRetry(
   cell: GridCell,
-  categories: string[]
+  categories: string[],
+  amapKey?: string
 ): Promise<AmapPoiItem[]> {
   for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
     try {
-      return await collectCellPois(cell, categories);
+      return await collectCellPois(cell, categories, amapKey);
     } catch (err: any) {
       if (err instanceof AmapApiError && err.fatal) {
         throw err;

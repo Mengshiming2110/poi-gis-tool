@@ -6,7 +6,7 @@ const JS_KEY_STORAGE = 'amap_js_key';
 const SECURITY_STORAGE = 'amap_security_code';
 
 function MobileSettingsTab() {
-  const [restKey, setRestKey] = useState(localStorage.getItem(REST_KEY_STORAGE) || '125c253ac5c0c03f9165bc3c721d130f');
+  const [restKey, setRestKey] = useState(localStorage.getItem(REST_KEY_STORAGE) || '');
   const [jsKey, setJsKey] = useState(localStorage.getItem(JS_KEY_STORAGE) || '35f0e1144644fbfba405c109db466cdc');
   const [security, setSecurity] = useState(localStorage.getItem(SECURITY_STORAGE) || '8d13a7d3f6ecff69f02dc1dea5855b0a');
   const [saved, setSaved] = useState(false);
@@ -16,9 +16,22 @@ function MobileSettingsTab() {
   const quotaBlocked = blockedDay === today;
 
   const handleSave = () => {
-    localStorage.setItem(REST_KEY_STORAGE, restKey);
-    localStorage.setItem(JS_KEY_STORAGE, jsKey);
-    localStorage.setItem(SECURITY_STORAGE, security);
+    const nextRestKey = restKey.trim();
+    const nextJsKey = jsKey.trim();
+    const nextSecurity = security.trim();
+
+    if (nextRestKey) localStorage.setItem(REST_KEY_STORAGE, nextRestKey);
+    else localStorage.removeItem(REST_KEY_STORAGE);
+
+    if (nextJsKey) localStorage.setItem(JS_KEY_STORAGE, nextJsKey);
+    else localStorage.removeItem(JS_KEY_STORAGE);
+
+    if (nextSecurity) localStorage.setItem(SECURITY_STORAGE, nextSecurity);
+    else localStorage.removeItem(SECURITY_STORAGE);
+
+    localStorage.removeItem('amap_quota_block_day');
+    localStorage.removeItem('amap_quota_block_key');
+    localStorage.removeItem('amap_quota_block_message');
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

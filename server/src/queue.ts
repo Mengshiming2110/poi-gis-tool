@@ -12,6 +12,7 @@ interface ActiveTask {
   currentIndex: number;
   status: TaskStatus;
   categories: string[];
+  amapKey?: string;
   onProgress: (data: any) => void;
   onComplete: (data: any) => void;
   onError: (data: any) => void;
@@ -83,6 +84,7 @@ export function startCollection(
     currentIndex: 0,
     status: 'running',
     categories: req.categories,
+    amapKey: req.amapKey?.trim() || undefined,
     onProgress,
     onComplete,
     onError,
@@ -117,7 +119,7 @@ async function processNextCell(taskId: string): Promise<void> {
   console.log(`[Queue] 处理格子 ${task.currentIndex + 1}/${task.cells.length} [${cell.row},${cell.col}]`);
   let pois: AmapPoiItem[] = [];
   try {
-    pois = await collectCellWithRetry(cell, task.categories);
+    pois = await collectCellWithRetry(cell, task.categories, task.amapKey);
   } catch (err: any) {
     const message = err instanceof AmapApiError ? err.message : (err?.message || '采集任务失败');
     console.error(`[Queue] 采集失败: taskId=${taskId} ${message}`);

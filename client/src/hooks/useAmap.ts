@@ -97,8 +97,10 @@ export function useAmap(containerId: string) {
           resizeEnable: true,
         });
 
-        instance.addControl(new AMap.Scale({ position: 'LB' }));
-        instance.addControl(new AMap.ToolBar({ position: 'RT' }));
+        if (!containerId.includes('mobile')) {
+          instance.addControl(new AMap.Scale({ position: 'LB' }));
+          instance.addControl(new AMap.ToolBar({ position: 'RT' }));
+        }
 
         const mouseTool = new AMap.MouseTool(instance);
         mouseToolRef.current = mouseTool;
@@ -432,7 +434,7 @@ export function useAmap(containerId: string) {
   ): Promise<any[]> => {
     if (cells.length === 0) return [];
 
-    const REST_KEY = localStorage.getItem('amap_rest_key') || '125c253ac5c0c03f9165bc3c721d130f';
+    const REST_KEY = (localStorage.getItem('amap_rest_key') || '').trim();
     const PAGE_SIZE = 25;
     const REQUEST_DELAY_MS = 500;
     const MAX_PAGES_PER_QUERY = Number(localStorage.getItem('amap_max_pages_per_query') || '2');
@@ -447,6 +449,13 @@ export function useAmap(containerId: string) {
     const totalTasks = cells.length * categories.length;
     let done = 0;
     let firstError: string | null = null;
+
+    if (!REST_KEY) {
+      setPoiData([]);
+      setIsCollecting(false);
+      collectingRef.current = false;
+      throw new Error('请先在设置中配置高德 Web 服务 Key，再开始采集');
+    }
 
     const quotaBlocked = getQuotaBlockMessage(REST_KEY);
     if (quotaBlocked) {

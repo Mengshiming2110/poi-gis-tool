@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 // Key name used by useAmap.ts: 'amap_rest_key'
 const STORAGE_REST_KEY = 'amap_rest_key';
-const DEFAULT_REST_KEY = '125c253ac5c0c03f9165bc3c721d130f';
+const DEFAULT_REST_KEY = '';
 
 const STORAGE_JS_KEY = 'amap_js_key';
 const DEFAULT_JS_KEY = '35f0e1144644fbfba405c109db466cdc';
@@ -12,16 +12,27 @@ const DEFAULT_SECURITY = '8d13a7d3f6ecff69f02dc1dea5855b0a';
 
 function load() {
   return {
-    restKey: localStorage.getItem(STORAGE_REST_KEY) || DEFAULT_REST_KEY,
+    restKey: localStorage.getItem(STORAGE_REST_KEY) || '',
     jsKey: localStorage.getItem(STORAGE_JS_KEY) || DEFAULT_JS_KEY,
     securityCode: localStorage.getItem(STORAGE_SECURITY) || DEFAULT_SECURITY,
   };
 }
 
 function save(restKey: string, jsKey: string, securityCode: string) {
-  localStorage.setItem(STORAGE_REST_KEY, restKey);
-  localStorage.setItem(STORAGE_JS_KEY, jsKey);
-  localStorage.setItem(STORAGE_SECURITY, securityCode);
+  const nextRestKey = restKey.trim();
+  const nextJsKey = jsKey.trim();
+  const nextSecurityCode = securityCode.trim();
+
+  if (nextRestKey) localStorage.setItem(STORAGE_REST_KEY, nextRestKey);
+  else localStorage.removeItem(STORAGE_REST_KEY);
+
+  if (nextJsKey) localStorage.setItem(STORAGE_JS_KEY, nextJsKey);
+  else localStorage.removeItem(STORAGE_JS_KEY);
+
+  if (nextSecurityCode) localStorage.setItem(STORAGE_SECURITY, nextSecurityCode);
+  else localStorage.removeItem(STORAGE_SECURITY);
+
+  clearQuotaBlock();
 }
 
 function clearQuotaBlock() {
@@ -66,7 +77,7 @@ function MobileSettings({ open, onClose }: Props) {
   if (!open) return null;
 
   const handleSave = () => {
-    save(restKey || DEFAULT_REST_KEY, jsKey || DEFAULT_JS_KEY, securityCode || DEFAULT_SECURITY);
+    save(restKey, jsKey, securityCode);
     setQuotaStatus(getQuotaStatus());
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -129,7 +140,7 @@ function MobileSettings({ open, onClose }: Props) {
           type="text" style={inputStyle}
           value={restKey}
           onChange={(e) => setRestKey(e.target.value)}
-          placeholder={DEFAULT_REST_KEY}
+          placeholder="输入高德 Web 服务 Key"
         />
 
         <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' }}>

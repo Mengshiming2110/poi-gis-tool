@@ -2,8 +2,15 @@ import type { CollectRequest, CollectResponse, Task, PoiQueryResult } from '../t
 
 const BASE = '/api';
 
+function maskKey(key: string): string {
+  if (key.length <= 10) return '***';
+  return `${key.slice(0, 6)}...${key.slice(-4)}`;
+}
+
 export async function startCollection(req: CollectRequest): Promise<CollectResponse> {
-  console.log('[Client] 发送采集请求:', JSON.stringify(req, null, 2));
+  const safeReq = req.amapKey ? { ...req, amapKey: maskKey(req.amapKey) } : req;
+  console.log('[Client] 发送采集请求:', JSON.stringify(safeReq, null, 2));
+
   const res = await fetch(`${BASE}/collect`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { startCollection, pauseCollection, resumeCollection, cancelCollection } from '../queue';
 import { getTask } from '../db';
+import { config } from '../config';
 import type { CollectRequest } from '../types';
 
 const router = Router();
@@ -17,6 +18,13 @@ router.post('/', (req: Request, res: Response) => {
     res.status(400).json({ error: '请提供采集范围' });
     return;
   }
+
+  const effectiveAmapKey = body.amapKey?.trim() || config.amapKey;
+  if (!effectiveAmapKey) {
+    res.status(400).json({ error: '请先在设置中配置高德 Web 服务 Key，再开始采集' });
+    return;
+  }
+  body.amapKey = effectiveAmapKey;
 
   try {
     const result = startCollection(
