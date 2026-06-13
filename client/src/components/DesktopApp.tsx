@@ -498,7 +498,14 @@ function DesktopApp() {
             <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               {selectedPoi.phone && <a href={`tel:${selectedPoi.phone}`} className="desktop-btn primary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>📞 拨打电话</a>}
               <button className="desktop-btn" style={{ flex: 1 }}
-                onClick={() => { drawAPIRef.current?.flyTo(selectedPoi.lng, selectedPoi.lat); setView('map'); }}>
+                onClick={() => {
+                  const lng = selectedPoi.lng, lat = selectedPoi.lat;
+                  if (typeof lng !== 'number' || typeof lat !== 'number' || isNaN(lng) || isNaN(lat)) {
+                    showToast('坐标数据无效', 'error'); return;
+                  }
+                  try { drawAPIRef.current?.flyTo(lng, lat); } catch (e) { console.warn('[Desktop] flyTo error:', e); }
+                  setView('map');
+                }}>
                 📍 在地图中查看
               </button>
             </div>
