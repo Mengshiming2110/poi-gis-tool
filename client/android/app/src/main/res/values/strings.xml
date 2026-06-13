@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">POI采集工具</string>
+    <string name="title_activity_main">POI采集工具</string>
+    <string name="package_name">com.poi.gis.tool</string>
+    <string name="custom_url_scheme">com.poi.gis.tool</string>
+</resources>
