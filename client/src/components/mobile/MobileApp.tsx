@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import StepIndicator from './StepIndicator';
 import StepCategories from './StepCategories';
 import StepDraw from './StepDraw';
@@ -16,6 +16,14 @@ function MobileApp() {
 
   // Single shared map instance for steps 2-3
   const amap = useAmap('mobile-map');
+
+  useEffect(() => {
+    if ((step === 2 || step === 3) && amap.map) {
+      setTimeout(() => {
+        try { amap.map.resize(); } catch (e) {}
+      }, 100);
+    }
+  }, [step, amap.map]);
 
   const handleLocate = async () => {
     setLocating(true);
@@ -47,10 +55,14 @@ function MobileApp() {
       <StepIndicator current={step} onStepClick={setStep} />
 
       <div className="mobile-body">
-        {/* Map div always present for steps 2-3, hidden otherwise */}
+        {/* Keep map measurable even outside map steps; AMap misbehaves if initialized in display:none. */}
         <div id="mobile-map" style={{
-          width: '100%', height: '100%',
-          display: (step === 2 || step === 3) ? 'block' : 'none',
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          visibility: (step === 2 || step === 3) ? 'visible' : 'hidden',
+          pointerEvents: (step === 2 || step === 3) ? 'auto' : 'none',
         }} />
 
         {/* Locate button — overlay on map, steps 2-3 */}

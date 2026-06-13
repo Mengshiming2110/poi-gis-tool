@@ -19,7 +19,7 @@ function buildCSV(pois: any[]): string {
       .map((v: string | number) => `"${String(v).replace(/"/g, '""')}"`)
       .join(',')
   );
-  return [header, ...rows].join('\n');
+  return `\ufeff${[header, ...rows].join('\n')}`;
 }
 
 function buildGeoJSON(pois: any[]) {
@@ -45,6 +45,35 @@ function downloadBlob(content: string, filename: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
+async function shareOrDownload(content: string, filename: string, mime: string, title: string) {
+  const blob = new Blob([content], { type: mime });
+  const file = new File([blob], filename, { type: mime });
+  const nav = navigator as Navigator & {
+    canShare?: (data: ShareData) => boolean;
+  };
+
+  if (navigator.share) {
+    try {
+      const data: ShareData = { title, text: title, files: [file] };
+      if (!nav.canShare || nav.canShare(data)) {
+        await navigator.share(data);
+        return;
+      }
+    } catch {
+      // Fall through to the next save path.
+    }
+
+    try {
+      await navigator.share({ title, text: content });
+      return;
+    } catch {
+      // Fall through to browser download.
+    }
+  }
+
+  downloadBlob(content, filename, mime);
+}
+
 function StepResults({ pois, categories, onRestart }: Props) {
   const [copied, setCopied] = useState(false);
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
@@ -60,9 +89,11 @@ function StepResults({ pois, categories, onRestart }: Props) {
         total_cells: 0, // mobile doesn't track cell count separately
         total_pois: pois.length,
       });
-      if (!taskId) throw new Error('创建任务失败');
 
       const count = await insertCloudPois(taskId, pois);
+      if (count !== pois.length) {
+        throw new Error(`只同步了 ${count}/${pois.length} 条，请重试`);
+      }
       setSyncState('done');
       setSyncMsg(`已同步 ${count} 条到云端`);
     } catch (e: any) {
@@ -73,26 +104,7 @@ function StepResults({ pois, categories, onRestart }: Props) {
 
   const handleShare = async () => {
     const csv = buildCSV(pois);
-    // Web Share API (native share sheet on mobile)
-    if (navigator.share) {
-      try {
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const file = new File([blob], 'poi-data.csv', { type: 'text/csv' });
-        await navigator.share({
-          title: 'POI 采集数据',
-          text: `${pois.length} 条POI数据`,
-          files: [file],
-        });
-      } catch {
-        // Fallback: share as text
-        await navigator.share({
-          title: 'POI 采集数据',
-          text: `共 ${pois.length} 条POI:\n${csv}`,
-        });
-      }
-    } else {
-      downloadBlob(csv, 'poi-data.csv', 'text/csv');
-    }
+    await shareOrDownload(csv, 'poi-data.csv', 'text/csv', `POI 采集数据（${pois.length}条）`);
   };
 
   const handleCopy = async () => {
@@ -117,11 +129,11 @@ function StepResults({ pois, categories, onRestart }: Props) {
   };
 
   const handleGeoJSON = () => {
-    downloadBlob(buildGeoJSON(pois), 'pois.geojson', 'application/geo+json');
+    shareOrDownload(buildGeoJSON(pois), 'pois.geojson', 'application/geo+json', `POI GeoJSON（${pois.length}条）`);
   };
 
   const handleCSV = () => {
-    downloadBlob(buildCSV(pois), 'poi-data.csv', 'text/csv');
+    shareOrDownload(buildCSV(pois), 'poi-data.csv', 'text/csv', `POI CSV（${pois.length}条）`);
   };
 
   return (
@@ -154,7 +166,7 @@ function StepResults({ pois, categories, onRestart }: Props) {
         </button>
         <button className="mobile-btn mobile-btn-secondary" style={{ padding: '8px 16px', fontSize: 13, width: 'auto' }}
           onClick={handleCSV}>
-          📄 CSV
+          📄 保存CSV
         </button>
         <button className="mobile-btn mobile-btn-secondary" style={{ padding: '8px 16px', fontSize: 13, width: 'auto' }}
           onClick={handleGeoJSON}>

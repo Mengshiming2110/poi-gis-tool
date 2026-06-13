@@ -34,7 +34,7 @@ export async function createCloudTask(task: {
   categories: string;
   total_cells: number;
   total_pois: number;
-}): Promise<string | null> {
+}): Promise<string> {
   const { data, error } = await supabase.from('tasks').insert({
     mode: 'region',
     categories: task.categories,
@@ -46,7 +46,7 @@ export async function createCloudTask(task: {
 
   if (error) {
     console.error('[Supabase] createCloudTask error:', error);
-    return null;
+    throw new Error(error.message || '创建云端任务失败');
   }
   return data.id;
 }
@@ -63,7 +63,7 @@ export async function insertCloudPois(taskId: string, pois: Array<{
     const { error } = await supabase.from('pois').insert(batch);
     if (error) {
       console.error('[Supabase] insertCloudPois error:', error);
-      return inserted;
+      throw new Error(`POI同步失败：已上传 ${inserted}/${pois.length} 条，${error.message}`);
     }
     inserted += batch.length;
   }

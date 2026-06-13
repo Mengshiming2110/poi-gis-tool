@@ -26,6 +26,7 @@ function StepCollect({ categories, gridCells, collectPOIsClientSide, stopCollect
   const [total] = useState(gridCells.length * categories.length);
   const [poiCount, setPoiCount] = useState(0);
   const [status, setStatus] = useState<'running' | 'done'>('running');
+  const [stopping, setStopping] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,8 +130,9 @@ function StepCollect({ categories, gridCells, collectPOIsClientSide, stopCollect
 
       {status === 'running' && (
         <button className="mobile-btn mobile-btn-secondary" style={{ marginTop: 40, width: 140 }}
-          onClick={() => { stop(); setStatus('done'); }}>
-          暂停
+          disabled={stopping}
+          onClick={() => { setStopping(true); stop(); }}>
+          {stopping ? '正在停止...' : '停止并查看'}
         </button>
       )}
     </div>

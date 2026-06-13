@@ -39,6 +39,10 @@ function StepDraw({ loaded, drawnShape, setDrawMode: applyMode, clearDrawings, g
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [loaded, drawnShape, getDrawnShape, onShapeChange]);
 
+  useEffect(() => {
+    if (drawnShape) setDrawMode(null);
+  }, [drawnShape]);
+
   return (
     <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
       {/* Status badge */}

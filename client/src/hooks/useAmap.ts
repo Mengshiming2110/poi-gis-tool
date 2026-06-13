@@ -422,6 +422,7 @@ export function useAmap(containerId: string) {
 
     const REST_KEY = localStorage.getItem('amap_rest_key') || '125c253ac5c0c03f9165bc3c721d130f';
     const PAGE_SIZE = 25;
+    const REQUEST_DELAY_MS = 500;
 
     setIsCollecting(true);
     collectingRef.current = true;
@@ -432,6 +433,7 @@ export function useAmap(containerId: string) {
     let done = 0;
     let firstError: string | null = null;
 
+    outer:
     for (const cell of cells) {
       if (!collectingRef.current) break;
       for (const catCode of categories) {
@@ -443,6 +445,7 @@ export function useAmap(containerId: string) {
           const { pois: page1, total: count } = await fetchAmapPOIs(
             REST_KEY, cell.center, radius, catCode, 1, PAGE_SIZE,
           );
+          await delay(REQUEST_DELAY_MS);
 
           page1.forEach((poi: any) => {
             const key = poi.id || `${poi.name}_${poi.lng?.toFixed(5)}_${poi.lat?.toFixed(5)}`;
@@ -459,6 +462,7 @@ export function useAmap(containerId: string) {
             const { pois: pagePois } = await fetchAmapPOIs(
               REST_KEY, cell.center, radius, catCode, p, PAGE_SIZE,
             );
+            await delay(REQUEST_DELAY_MS);
             pagePois.forEach((poi: any) => {
               const key = poi.id || `${poi.name}_${poi.lng?.toFixed(5)}_${poi.lat?.toFixed(5)}`;
               if (!seen.has(key)) {
@@ -469,11 +473,17 @@ export function useAmap(containerId: string) {
           }
         } catch (e: any) {
           console.warn('[REST] 搜索出错:', e);
-          if (!firstError) firstError = e?.message || String(e);
+          const message = e?.message || String(e);
+          if (!firstError) firstError = message;
+          if (isFatalAmapError(message)) {
+            done++;
+            onCellProgress(done, totalTasks, allPois.length);
+            break outer;
+          }
         }
         done++;
         onCellProgress(done, totalTasks, allPois.length);
-        await new Promise(r => setTimeout(r, 200));
+        await delay(REQUEST_DELAY_MS);
       }
     }
 
@@ -544,7 +554,7 @@ async function fetchAmapPOIs(
   console.log(`[REST] 响应: status=${data.status} count=${data.count} infocode=${data.infocode} info=${data.info}`);
 
   if (data.status !== '1') {
-    throw new Error(`${data.info || 'API错误'} [${data.infocode}]`);
+    throw new Error(formatAmapError(data.info, data.infocode));
   }
 
   const pois = (data.pois || []).map((p: any) => {
@@ -561,6 +571,33 @@ async function fetchAmapPOIs(
   });
 
   return { pois, total: parseInt(data.count) || 0 };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function formatAmapError(info?: string, infocode?: string): string {
+  const code = infocode || 'UNKNOWN';
+  if (info === 'USER_DAILY_QUERY_OVER_LIMIT' || code === '10044') {
+    return `高德 Web服务 Key 今日配额已用完 [${code}]`;
+  }
+  if (info === 'USERKEY_PLAT_NOMATCH' || code === '10009') {
+    return `高德 Key 类型不匹配，请使用绑定“Web服务”的 Key [${code}]`;
+  }
+  if (info === 'INVALID_USER_KEY' || code === '10001') {
+    return `高德 Key 无效 [${code}]`;
+  }
+  return `${info || '高德API错误'} [${code}]`;
+}
+
+function isFatalAmapError(message: string): boolean {
+  return message.includes('配额已用完') ||
+    message.includes('Key 类型不匹配') ||
+    message.includes('Key 无效') ||
+    message.includes('10044') ||
+    message.includes('10009') ||
+    message.includes('10001');
 }
 
 function generateGridCells(bounds: [[number, number], [number, number]], gridSizeMeters: number): GridCell[] {
