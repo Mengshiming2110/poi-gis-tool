@@ -2,6 +2,7 @@ import { v4 as uuid } from 'uuid';
 import { collectCellWithRetry } from './services/amap';
 import { generateGrid, filterCellsByPolygon, estimateTime } from './services/grid';
 import { createTask, updateTaskStatus, incrementTaskProgress, insertPois, getTask } from './db';
+import { cloudInsertTask, cloudUpdateTask, cloudInsertPois } from './services/cloud';
 import { config } from './config';
 import type { CollectRequest, GridCell, AmapPoiItem, TaskStatus } from './types';
 
@@ -55,6 +56,13 @@ export function startCollection(
 
   console.log(`[Queue] 开始采集: taskId=${taskId} mode=${req.mode} categories=${req.categories.join(',')} cells=${cells.length}`);
 
+  // Dual-write: local SQLite + Supabase cloud
+  cloudInsertTask({
+    id: taskId, mode: req.mode, categories: JSON.stringify(req.categories),
+    grid_size: req.gridSize, total_cells: cells.length,
+    bounds: req.bounds,
+  }).catch(() => {});
+
   createTask({
     id: taskId,
     mode: req.mode,
@@ -95,6 +103,7 @@ async function processNextCell(taskId: string): Promise<void> {
     const t = getTask(taskId);
     console.log(`[Queue] 采集完成: taskId=${taskId} totalPois=${t?.total_pois || 0}`);
     updateTaskStatus(taskId, 'done');
+    cloudUpdateTask(taskId, { status: 'done', total_pois: t?.total_pois || 0, done_cells: t?.done_cells || 0 }).catch(() => {});
     task.status = 'done';
     task.onComplete({ taskId, totalPois: t?.total_pois || 0 });
     activeTasks.delete(taskId);
@@ -107,6 +116,14 @@ async function processNextCell(taskId: string): Promise<void> {
   console.log(`[Queue] 格子 ${task.currentIndex + 1} 返回 ${pois.length} 条POI`);
 
   if (pois.length > 0) {
+    // Cloud sync
+    cloudInsertPois(taskId, pois.map(p => ({
+      name: p.name, category: CATEGORY_MAP[(p.typecode || '').split('|')[1]?.slice(0, 6)] || '',
+      subcategory: (p.type || '').split(';')[1] || '', address: p.address || '',
+      lng: parseFloat(p.location.split(',')[0]), lat: parseFloat(p.location.split(',')[1]),
+      phone: p.tel || '', rating: p.biz_ext?.rating ? parseFloat(p.biz_ext.rating) : null,
+    }))).catch(() => {});
+
     insertPois(taskId, pois.map(p => {
       const parts = (p.typecode || '').split('|');
       const code = parts.length > 1 ? parts[1].slice(0, 6) : '';
