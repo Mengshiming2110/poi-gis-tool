@@ -4,7 +4,7 @@ import UpdatePrompt from './UpdatePrompt';
 import { useCollection } from '../hooks/useCollection';
 import { useSSE } from '../hooks/useSSE';
 import { getExportUrl, queryPois } from '../services/api';
-import { createCloudTask, insertCloudPois } from '../services/supabase';
+import { createCloudTask, insertCloudPois, getTasks, type CloudTask } from '../services/supabase';
 import { checkForUpdate, CURRENT_VERSION, RELEASES_URL, type UpdateInfo } from '../services/updater';
 import { CATEGORY_LIST, type PoiRecord } from '../types/poi';
 import type { MapAPI, DrawnShape, GridCell } from './MapView';
@@ -111,6 +111,8 @@ function DesktopApp() {
   const [selectedPoi, setSelectedPoi] = useState<PoiRecord | null>(null);
   const [collectedPois, setCollectedPois] = useState<PoiRecord[]>([]);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
+  const [cloudTasks, setCloudTasks] = useState<CloudTask[]>([]);
+  const [loadingCloud, setLoadingCloud] = useState(false);
 
   const drawAPIRef = useRef<MapAPI | null>(null);
   const collection = useCollection();
@@ -567,6 +569,41 @@ function DesktopApp() {
             </button>
           </div>
           {syncStatus === 'done' && <p style={{ fontSize: 10, color: 'var(--success)', marginTop: 6 }}>上传成功</p>}
+        </div>
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>☁ 云端任务</h3>
+            <button className="desktop-btn" style={{ padding: '3px 12px', fontSize: 11 }}
+              onClick={async () => {
+                setLoadingCloud(true);
+                try { setCloudTasks(await getTasks()); } catch { showToast('获取云端数据失败', 'error'); }
+                setLoadingCloud(false);
+              }}>
+              {loadingCloud ? '加载中...' : '🔄 刷新'}
+            </button>
+          </div>
+          {cloudTasks.length === 0 ? (
+            <p style={{ fontSize: 12, color: 'var(--muted)' }}>
+              {loadingCloud ? '加载中...' : '点击刷新查看已上传到云端的任务'}
+            </p>
+          ) : (
+            cloudTasks.slice(0, 5).map(t => (
+              <div key={t.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ fontWeight: 500 }}>{(() => {
+                    try { return JSON.parse(t.categories).join('、'); } catch { return t.categories; }
+                  })()}</span>
+                  <span style={{ color: 'var(--muted)', fontSize: 11 }}>
+                    {new Date(t.created_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div style={{ color: 'var(--muted)', fontSize: 11 }}>
+                  {t.total_pois} 条 POI · {t.status === 'done' ? '✅ 已完成' : t.status}
+                  <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>{t.id.slice(0, 8)}</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
         <div className="card">
           <div style={{ fontSize: 28, marginBottom: 4 }}>📥</div>
