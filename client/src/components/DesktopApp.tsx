@@ -140,18 +140,26 @@ function DesktopApp() {
   useEffect(() => {
     if (!collection.taskId) return;
     let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 3;
 
     const load = async () => {
       try {
         const result = await queryPois({ taskId: collection.taskId!, page: 1, pageSize: 500 });
-        if (!cancelled) setCollectedPois(result.pois);
-      } catch { /* server might not be ready */ }
+        if (!cancelled) {
+          console.log(`[Desktop] POI加载完成: ${result.pois.length} 条, total=${result.total}, status=${collection.status}`);
+          setCollectedPois(result.pois);
+        }
+      } catch (e: any) {
+        console.warn(`[Desktop] POI加载失败 (attempt ${attempts + 1}/${maxAttempts}):`, e?.message);
+        attempts++;
+      }
     };
 
     load();
     if (collection.status === 'running') {
-      const timer = setInterval(load, POLL_INTERVAL);
-      return () => { cancelled = true; clearInterval(timer); };
+      const interval = setInterval(load, POLL_INTERVAL);
+      return () => { cancelled = true; clearInterval(interval); };
     }
     return () => { cancelled = true; };
   }, [collection.taskId, collection.status]);
@@ -420,7 +428,17 @@ function DesktopApp() {
             </tbody>
           </table>
         )}
-        {collectedPois.length === 0 && (
+        {collectedPois.length === 0 && collection.status === 'done' && (
+          <div style={{ textAlign: 'center', padding: 40, fontSize: 13 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+            <div style={{ color: 'var(--success)', fontWeight: 600, marginBottom: 4 }}>采集完成</div>
+            <div style={{ color: 'var(--muted)' }}>
+              共 {collection.progress.totalPois || 0} 条 POI 已入库
+              {collection.progress.totalPois === 0 ? '（该区域未搜索到匹配的 POI）' : ''}
+            </div>
+          </div>
+        )}
+        {collectedPois.length === 0 && collection.status !== 'done' && (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)', fontSize: 13 }}>
             {collection.taskId ? '数据加载中...' : '暂无数据，请先在地图工作台执行采集'}
           </div>
@@ -512,14 +530,20 @@ function DesktopApp() {
     }
   };
 
+  const handleUploadRef = useRef(handleUpload);
+  handleUploadRef.current = handleUpload;
+
   // Auto-upload when collection completes and toggle is on
+  const prevStatusRef = useRef(collection.status);
   useEffect(() => {
-    if (collection.status === 'done' && collection.taskId && collectedPois.length > 0) {
+    const wasRunning = prevStatusRef.current === 'running';
+    prevStatusRef.current = collection.status;
+    if (wasRunning && collection.status === 'done' && collection.taskId && collectedPois.length > 0) {
       if (localStorage.getItem('amap_auto_upload') === 'true') {
-        handleUpload();
+        handleUploadRef.current();
       }
     }
-  }, [collection.status]);
+  }, [collection.status, collectedPois.length]);
 
   const renderManageView = () => (
     <div style={{ padding: 20, maxWidth: 800, margin: '0 auto', width: '100%', overflow: 'auto' }}>
