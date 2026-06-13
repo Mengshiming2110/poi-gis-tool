@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import StepIndicator from './StepIndicator';
 import StepCategories from './StepCategories';
 import StepDraw from './StepDraw';
 import StepGrid from './StepGrid';
@@ -8,14 +7,12 @@ import StepResults from './StepResults';
 import { useAmap, type DrawnShape } from '../../hooks/useAmap';
 import { CATEGORY_LIST } from '../../types/poi';
 
-const STEP_TITLES = ['选择目标', '圈定区域', '采集精度', '获取数据', '保存结果'];
-
-const STEP_HINTS = [
-  '选择要采集的 POI 类型',
-  '在地图上圈出要分析的范围',
-  '选择采集精度并生成网格',
-  '正在获取 POI，缓存会自动复用',
-  '同步到桌面端或导出数据',
+const PANEL_COPY = [
+  { title: '想采集什么？', hint: '选择目标类型，少选类别能节省 API 调用。' },
+  { title: '圈一个范围', hint: '选择绘制方式后，直接在地图上操作。' },
+  { title: '设置采集精度', hint: '先用省额度或均衡，确认范围后再细化。' },
+  { title: '正在获取 POI', hint: '缓存会自动复用，触发限额会立即停止。' },
+  { title: '数据已准备好', hint: '同步到桌面端，或分享导出文件。' },
 ];
 
 function MobileApp() {
@@ -74,16 +71,6 @@ function MobileApp() {
 
   return (
     <div className="mobile-app">
-      <div className="mobile-topbar">
-        <div>
-          <div className="mobile-kicker">POI 地图工作台</div>
-          <div className="mobile-title">{STEP_TITLES[step - 1]}</div>
-        </div>
-        <div className="mobile-status-pill">
-          {categories.length} 类 · {amap.gridCells.length} 格
-        </div>
-      </div>
-      <StepIndicator current={step} onStepClick={setStep} />
       <div className="mobile-body">
         <div id="mobile-map" style={{
           position: 'absolute',
@@ -107,8 +94,8 @@ function MobileApp() {
           <div className="mobile-sheet-handle" />
           <div className="mobile-sheet-head">
             <div>
-              <div className="mobile-sheet-title">{STEP_TITLES[step - 1]}</div>
-              <div className="mobile-sheet-subtitle">{STEP_HINTS[step - 1]}</div>
+              <div className="mobile-sheet-title">{PANEL_COPY[step - 1].title}</div>
+              <div className="mobile-sheet-subtitle">{PANEL_COPY[step - 1].hint}</div>
             </div>
             {step > 1 && selectedNames.length > 0 && (
               <div className="mobile-mini-summary">
