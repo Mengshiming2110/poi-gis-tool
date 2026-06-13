@@ -39,6 +39,10 @@ function DesktopApp() {
     setTimeout(() => setToast(null), 2500);
   }, []);
 
+  useEffect(() => {
+    if (collection.error) showToast(collection.error, 'error');
+  }, [collection.error, showToast]);
+
   const disabled = selectedCategories.length === 0
     || collection.status === 'running'
     || (mode === 'region' && gridCells.length === 0);
@@ -128,6 +132,7 @@ function DesktopApp() {
           progress={collection.progress}
           totalPois={collection.totalPois}
           taskId={collection.taskId}
+          error={collection.error}
           onPause={collection.pause}
           onResume={collection.resume}
           onCancel={collection.cancel}

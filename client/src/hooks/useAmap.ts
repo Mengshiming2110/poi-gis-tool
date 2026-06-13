@@ -23,6 +23,12 @@ interface CachedPoiResult {
 
 // Config from localStorage, fallback to defaults
 function getConfig() {
+  // Migrate old wsKey → restKey if needed
+  const oldWsKey = localStorage.getItem('amap_ws_key');
+  if (oldWsKey && !localStorage.getItem('amap_rest_key')) {
+    localStorage.setItem('amap_rest_key', oldWsKey);
+  }
+
   return {
     jsKey: localStorage.getItem('amap_js_key') || '35f0e1144644fbfba405c109db466cdc',
     securityCode: localStorage.getItem('amap_security_code') || '8d13a7d3f6ecff69f02dc1dea5855b0a',

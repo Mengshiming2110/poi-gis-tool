@@ -12,7 +12,7 @@ export async function startCollection(req: CollectRequest): Promise<CollectRespo
   const json = await res.json();
   if (!res.ok) {
     console.error('[Client] 采集请求失败:', json);
-    throw new Error('采集请求失败');
+    throw new Error(json?.error || '采集请求失败');
   }
   console.log('[Client] 采集任务已创建:', json);
   return json;
@@ -51,7 +51,7 @@ export async function queryPois(params: {
   if (params.category) searchParams.set('category', params.category);
 
   const res = await fetch(`${BASE}/pois?${searchParams}`);
-  if (!res.ok) throw new Error('查询POI失败');
+  if (!res.ok) throw new Error('查询 POI 失败');
   return res.json();
 }
 

@@ -46,9 +46,14 @@ export async function initDb(): Promise<void> {
       total_cells INTEGER DEFAULT 0,
       done_cells  INTEGER DEFAULT 0,
       total_pois  INTEGER DEFAULT 0,
+      error_message TEXT,
       created_at  TEXT DEFAULT (datetime('now'))
     )
   `);
+  const taskColumns = db.exec('PRAGMA table_info(tasks)')[0]?.values.map(row => row[1]);
+  if (taskColumns && !taskColumns.includes('error_message')) {
+    db.run('ALTER TABLE tasks ADD COLUMN error_message TEXT');
+  }
   db.run(`
     CREATE TABLE IF NOT EXISTS pois (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,6 +100,11 @@ export function getTask(id: string): Task | undefined {
 
 export function updateTaskStatus(id: string, status: TaskStatus): void {
   db.run('UPDATE tasks SET status = ? WHERE id = ?', [status, id]);
+  saveDb();
+}
+
+export function failTask(id: string, errorMessage: string): void {
+  db.run('UPDATE tasks SET status = ?, error_message = ? WHERE id = ?', ['failed', errorMessage, id]);
   saveDb();
 }
 

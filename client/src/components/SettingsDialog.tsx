@@ -4,7 +4,7 @@ import { Gear, X } from '@phosphor-icons/react';
 const STORAGE_KEYS = {
   jsKey: 'amap_js_key',
   securityCode: 'amap_security_code',
-  wsKey: 'amap_ws_key',
+  wsKey: 'amap_rest_key',
 };
 
 const DEFAULTS = {

@@ -64,11 +64,11 @@ export function useCollection() {
   }, []);
 
   const onComplete = useCallback((data: { totalPois: number }) => {
-    setState(s => ({ ...s, status: 'done', totalPois: data.totalPois }));
+    setState(s => ({ ...s, status: 'done', totalPois: data.totalPois, error: null }));
   }, []);
 
   const onError = useCallback((err: string) => {
-    setState(s => ({ ...s, error: err }));
+    setState(s => ({ ...s, status: 'failed', loading: false, error: err }));
   }, []);
 
   return { ...state, start, pause, resume, cancel, onProgress, onComplete, onError };

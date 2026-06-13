@@ -84,6 +84,10 @@ router.get('/:id/progress', (req: Request, res: Response) => {
       sendEvent('complete', { totalPois: current.total_pois });
       clearInterval(interval);
       res.end();
+    } else if (current.status === 'failed') {
+      sendEvent('failed', { error: current.error_message || '采集任务失败' });
+      clearInterval(interval);
+      res.end();
     } else if (current.status === 'cancelled') {
       sendEvent('cancelled', {});
       clearInterval(interval);

@@ -15,6 +15,7 @@ export function useSSE(
 
     const es = new EventSource(getProgressUrl(taskId));
     eventSourceRef.current = es;
+    let closedByServer = false;
 
     es.addEventListener('progress', (e) => {
       const data = JSON.parse(e.data);
@@ -23,12 +24,20 @@ export function useSSE(
 
     es.addEventListener('complete', (e) => {
       const data = JSON.parse(e.data);
+      closedByServer = true;
       onComplete(data);
       es.close();
     });
 
+    es.addEventListener('failed', (e) => {
+      const data = JSON.parse(e.data);
+      closedByServer = true;
+      onError(data.error || '采集任务失败');
+      es.close();
+    });
+
     es.onerror = () => {
-      onError('SSE 连接中断');
+      if (!closedByServer) onError('采集进度连接中断');
     };
 
     return () => {

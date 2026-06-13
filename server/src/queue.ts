@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
-import { collectCellWithRetry } from './services/amap';
+import { AmapApiError, collectCellWithRetry } from './services/amap';
 import { generateGrid, filterCellsByPolygon, estimateTime } from './services/grid';
-import { createTask, updateTaskStatus, incrementTaskProgress, insertPois, getTask } from './db';
+import { createTask, updateTaskStatus, incrementTaskProgress, insertPois, getTask, failTask } from './db';
 import { cloudInsertTask, cloudUpdateTask, cloudInsertPois } from './services/cloud';
 import { config } from './config';
 import type { CollectRequest, GridCell, AmapPoiItem, TaskStatus } from './types';
@@ -14,6 +14,7 @@ interface ActiveTask {
   categories: string[];
   onProgress: (data: any) => void;
   onComplete: (data: any) => void;
+  onError: (data: any) => void;
 }
 
 const activeTasks = new Map<string, ActiveTask>();
@@ -45,7 +46,8 @@ function mapSubcategory(typeStr: string): string {
 export function startCollection(
   req: CollectRequest,
   onProgress: (data: any) => void,
-  onComplete: (data: any) => void
+  onComplete: (data: any) => void,
+  onError: (data: any) => void = () => {}
 ): { taskId: string; totalCells: number; estimatedMinutes: number } {
   const taskId = uuid();
   let cells = generateGrid(req.bounds, req.gridSize || 0.01);
@@ -83,6 +85,7 @@ export function startCollection(
     categories: req.categories,
     onProgress,
     onComplete,
+    onError,
   };
 
   activeTasks.set(taskId, task);
@@ -112,7 +115,19 @@ async function processNextCell(taskId: string): Promise<void> {
 
   const cell = task.cells[task.currentIndex];
   console.log(`[Queue] 处理格子 ${task.currentIndex + 1}/${task.cells.length} [${cell.row},${cell.col}]`);
-  const pois: AmapPoiItem[] = await collectCellWithRetry(cell, task.categories);
+  let pois: AmapPoiItem[] = [];
+  try {
+    pois = await collectCellWithRetry(cell, task.categories);
+  } catch (err: any) {
+    const message = err instanceof AmapApiError ? err.message : (err?.message || '采集任务失败');
+    console.error(`[Queue] 采集失败: taskId=${taskId} ${message}`);
+    failTask(taskId, message);
+    cloudUpdateTask(taskId, { status: 'failed' }).catch(() => {});
+    task.status = 'failed';
+    task.onError({ taskId, error: message });
+    activeTasks.delete(taskId);
+    return;
+  }
   console.log(`[Queue] 格子 ${task.currentIndex + 1} 返回 ${pois.length} 条POI`);
 
   if (pois.length > 0) {

@@ -3,6 +3,32 @@ import type { GridCell, AmapSearchResponse, AmapPoiItem } from '../types';
 
 const BASE_URL = 'https://restapi.amap.com/v3/place/polygon';
 
+export class AmapApiError extends Error {
+  constructor(
+    message: string,
+    public readonly info?: string,
+    public readonly infocode?: string,
+    public readonly fatal: boolean = true
+  ) {
+    super(message);
+    this.name = 'AmapApiError';
+  }
+}
+
+function formatAmapError(info?: string, infocode?: string): string {
+  const code = infocode || info || 'UNKNOWN';
+  if (info === 'USER_DAILY_QUERY_OVER_LIMIT' || infocode === '10044' || info === 'OVER_QUOTA') {
+    return `高德 Web服务 API 今日调用额度已用完（${code}），请明天再试或更换有额度的 Web服务 Key。`;
+  }
+  if (info === 'USERKEY_PLAT_NOMATCH' || infocode === '10009') {
+    return `高德 Key 类型不匹配（${code}），服务端采集必须使用绑定“Web服务”的 Key。`;
+  }
+  if (info === 'INVALID_USER_KEY' || infocode === '10001') {
+    return `高德 Key 无效（${code}），请检查服务端 Web服务 Key 配置。`;
+  }
+  return `高德 API 调用失败（${code}）：${info || '未知错误'}`;
+}
+
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -32,7 +58,7 @@ export async function searchPoiInCell(
     throw new Error(`Amap API HTTP error: ${response.status}`);
   }
   const json = await response.json() as AmapSearchResponse;
-  console.log(`[Amap] 响应: status=${json.status} count=${json.count} pois=${json.pois?.length || 0} info=${json.info}`);
+  console.log(`[Amap] 响应: status=${json.status} count=${json.count} pois=${json.pois?.length || 0} info=${json.info} infocode=${json.infocode || ''}`);
   return json;
 }
 
@@ -47,10 +73,7 @@ export async function collectCellPois(
     const result = await searchPoiInCell(cell, categories, page);
 
     if (result.status !== '1') {
-      if (result.info === 'OVER_QUOTA') {
-        throw new Error('OVER_QUOTA');
-      }
-      break;
+      throw new AmapApiError(formatAmapError(result.info, result.infocode), result.info, result.infocode, true);
     }
 
     const pois = result.pois || [];
@@ -75,14 +98,14 @@ export async function collectCellWithRetry(
     try {
       return await collectCellPois(cell, categories);
     } catch (err: any) {
-      if (err.message === 'OVER_QUOTA' && attempt < config.maxRetries) {
-        await sleep(config.retryDelay * (attempt + 1));
-        continue;
+      if (err instanceof AmapApiError && err.fatal) {
+        throw err;
       }
       if (attempt === config.maxRetries) {
         console.error(`Cell [${cell.row},${cell.col}] failed after ${config.maxRetries} retries`);
         return [];
       }
+      await sleep(config.retryDelay * (attempt + 1));
     }
   }
   return [];

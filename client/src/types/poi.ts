@@ -1,5 +1,5 @@
 export type TaskMode = 'grid' | 'region';
-export type TaskStatus = 'pending' | 'running' | 'paused' | 'done' | 'cancelled';
+export type TaskStatus = 'pending' | 'running' | 'paused' | 'done' | 'cancelled' | 'failed';
 
 export interface Bounds {
   southwest: { lng: number; lat: number };
@@ -30,6 +30,7 @@ export interface Task {
   total_cells: number;
   done_cells: number;
   total_pois: number;
+  error_message?: string | null;
   created_at: string;
 }
 
