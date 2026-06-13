@@ -6,3 +6,42 @@
   [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m588[22m[2m[0m ms[22m
 
   [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
+[2m21:43:57[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx[22m
+[2m21:44:53[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/mobile.css[22m
+[2m21:48:00[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx[22m
+[2m21:48:20[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/mobile.css[22m
+[2m21:53:58[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx, /src/components/MapView.tsx[22m
+[2m21:54:11[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/StepResults.tsx[22m
+[2m21:55:01[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/StepResults.tsx[22m
+[2m21:55:58[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx[22m
+[2m21:56:52[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/mobile.css[22m
+[2m22:01:47[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/app/src/main/assets/public/index.html[22m
+[2m22:02:27[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/app/build/intermediates/assets/debug/mergeDebugAssets/public/index.html[22m
+[2m22:02:29[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
+[2m22:08:27[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/mobile/MobileApp.tsx, /src/components/mobile/StepCategories.tsx, /src/components/mobile/StepCollect.tsx, /src/components/mobile/StepResults.tsx[22m
+[2m22:09:42[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:11:11[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileSettings.tsx[22m
+[2m22:11:50[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SettingsDialog.tsx[22m
+[2m22:16:34[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx, /src/components/MapView.tsx[22m
+[2m22:16:49[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/StepCollect.tsx[22m
+[2m22:17:06[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileSettings.tsx[22m
+[2m22:18:26[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/DataTable.tsx[22m
+[2m22:18:53[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/DataTable.tsx[22m
+[2m22:25:52[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:26:43[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/app/src/main/assets/public/index.html[22m
+[2m22:26:50[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/app/build/intermediates/assets/debug/mergeDebugAssets/public/index.html[22m
+[2m22:26:51[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
+[2m22:38:36[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/app/src/main/assets/public/index.html[22m
+[2m22:45:20[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
+[2m22:46:13[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
+[2m22:51:14[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:51:25[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:51:32[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:51:43[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:52:03[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:52:16[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:52:23[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:52:39[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:53:09[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:53:23[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m22:53:59[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m

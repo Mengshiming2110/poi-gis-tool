@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import MapView from './MapView';
 import DrawToolbar from './DrawToolbar';
 import SettingsDialog from './SettingsDialog';
@@ -6,9 +6,10 @@ import CloudPanel from './CloudPanel';
 import UpdatePrompt from './UpdatePrompt';
 import { useCollection } from '../hooks/useCollection';
 import { useSSE } from '../hooks/useSSE';
-import { getExportUrl } from '../services/api';
+import { getExportUrl, queryPois } from '../services/api';
+import { createCloudTask, insertCloudPois } from '../services/supabase';
 import { checkForUpdate, type UpdateInfo } from '../services/updater';
-import { CATEGORY_LIST } from '../types/poi';
+import { CATEGORY_LIST, type PoiRecord } from '../types/poi';
 import type { MapAPI, DrawnShape, GridCell } from './MapView';
 import '../App.css';
 
@@ -25,22 +26,8 @@ const NAV_MANAGE = [
   { id: 'settings' as View, label: '系统设置' },
 ];
 
-// Mock data for UI display
-const MOCK_POIS = [
-  { name: '川西坝子火锅', category: '餐饮', address: '高新区天府三街288号', status: 'pending' },
-  { name: '蜀九香火锅', category: '餐饮', address: '高新区天府大道1199号银泰城3F', status: 'pending' },
-  { name: '红旗连锁', category: '零售', address: '高新区科华路56号', status: 'done' },
-  { name: '大蓉和酒楼', category: '餐饮', address: '高新区天府二街78号', status: 'done' },
-  { name: '巴蜀风川菜', category: '餐饮', address: '锦江区红星路三段12号', status: 'pending' },
-  { name: '永辉超市', category: '零售', address: '锦江区东大街99号', status: 'done' },
-  { name: '龙抄手小吃', category: '餐饮', address: '青羊区宽窄巷子12号', status: 'pending' },
-];
-const MOCK_REGIONS = [
-  { name: '区域 A — 高新区南', done: 42, total: 56, cats: [{ n: '餐饮', c: 28 }, { n: '零售', c: 9 }, { n: '生活服务', c: 5 }] },
-  { name: '区域 B — 锦江区', done: 30, total: 48, cats: [{ n: '餐饮', c: 18 }, { n: '零售', c: 8 }, { n: '酒店住宿', c: 4 }] },
-  { name: '区域 C — 青羊区', done: 15, total: 38, cats: [{ n: '餐饮', c: 10 }, { n: '零售', c: 3 }, { n: '生活服务', c: 2 }] },
-];
-const MOCK_DUPS = ['红旗连锁 — 已存在于区域 A', '永辉超市 — 已存在于区域 B', '麦当劳 — 已存在于区域 A'];
+// Data loading
+const POLL_INTERVAL = 5000;
 
 function DesktopApp() {
   const [view, setView] = useState<View>('map');
@@ -54,7 +41,9 @@ function DesktopApp() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [apiStatus, setApiStatus] = useState<'idle' | 'busy' | 'error'>('idle');
   const [searchFilter, setSearchFilter] = useState({ type: 'all', region: 'all', status: 'all', query: '' });
-  const [selectedPoi, setSelectedPoi] = useState<any | null>(null);
+  const [selectedPoi, setSelectedPoi] = useState<PoiRecord | null>(null);
+  const [collectedPois, setCollectedPois] = useState<PoiRecord[]>([]);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
 
   const drawAPIRef = useRef<MapAPI | null>(null);
   const collection = useCollection();
@@ -69,6 +58,54 @@ function DesktopApp() {
     else setApiStatus('idle');
   }, [collection.status, collection.error]);
   useSSE(collection.taskId, collection.onProgress, collection.onComplete, collection.onError);
+
+  // Load POIs when taskId changes or collection status changes
+  useEffect(() => {
+    if (!collection.taskId) return;
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const result = await queryPois({ taskId: collection.taskId!, page: 1, pageSize: 500 });
+        if (!cancelled) setCollectedPois(result.pois);
+      } catch { /* server might not be ready */ }
+    };
+
+    load();
+    if (collection.status === 'running') {
+      const timer = setInterval(load, POLL_INTERVAL);
+      return () => { cancelled = true; clearInterval(timer); };
+    }
+    return () => { cancelled = true; };
+  }, [collection.taskId, collection.status]);
+
+  // Computed stats from real data
+  const { regionStats, duplicateCount } = useMemo(() => {
+    const byCategory: Record<string, number> = {};
+    let dups = 0;
+    const seen = new Set<string>();
+    collectedPois.forEach(p => {
+      byCategory[p.category] = (byCategory[p.category] || 0) + 1;
+      const key = p.name + p.address;
+      if (seen.has(key)) dups++;
+      else seen.add(key);
+    });
+    const regions = [{ name: '当前区域', done: collectedPois.length, total: collection.progress.totalCells > 0 ? collection.progress.totalCells * 3 : Math.max(collectedPois.length, 1), cats: Object.entries(byCategory).map(([n, c]) => ({ n, c })) }];
+    return { regionStats: regions, duplicateCount: dups };
+  }, [collectedPois, collection.progress.totalCells]);
+
+  // POI helpers
+  const filteredPois = useMemo(() => {
+    return collectedPois.filter(p => {
+      const status = 'done'; // all collected POIs are "done"
+      if (searchFilter.type !== 'all' && p.category !== searchFilter.type) return false;
+      if (searchFilter.status === 'pending') return false; // no pending in collected
+      if (searchFilter.query && !p.name?.includes(searchFilter.query) && !p.address?.includes(searchFilter.query)) return false;
+      return true;
+    });
+  }, [collectedPois, searchFilter]);
+
+  const categories = useMemo(() => ['all', ...new Set(collectedPois.map(p => p.category))], [collectedPois]);
 
   const showToast = useCallback((msg: string, type: 'info' | 'success' | 'error' = 'info') => {
     setToast({ msg, type }); setTimeout(() => setToast(null), 2500);
@@ -91,14 +128,6 @@ function DesktopApp() {
   }, [selectedCategories, gridSizeMeters, collection, showToast]);
 
   const disabled = selectedCategories.length === 0 || collection.status === 'running';
-
-  // Filter mock data
-  const filteredPois = MOCK_POIS.filter(p => {
-    if (searchFilter.type !== 'all' && p.category !== searchFilter.type) return false;
-    if (searchFilter.status !== 'all' && p.status !== searchFilter.status) return false;
-    if (searchFilter.query && !p.name.includes(searchFilter.query) && !p.address.includes(searchFilter.query)) return false;
-    return true;
-  });
 
   const renderMapView = () => (
     <div className="desktop-map-view">
@@ -176,29 +205,17 @@ function DesktopApp() {
         <div style={{ padding: '10px 14px' }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>商户类型</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-            {['all', ...CATEGORY_LIST.slice(0, 6).map(c => c.name)].map(t => (
+            {categories.map(t => (
               <button key={t} className="desktop-btn" style={{
                 padding: '4px 10px', fontSize: 11, borderRadius: 99,
                 background: searchFilter.type === t ? 'var(--accent)' : undefined,
                 color: searchFilter.type === t ? '#fff' : undefined,
-                borderColor: searchFilter.type === t ? 'var(--accent)' : undefined,
-              }} onClick={() => setSearchFilter(prev => ({ ...prev, type: t === 'all' ? 'all' : t }))}>{t === 'all' ? '全部' : t}</button>
-            ))}
-          </div>
-          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>采集区域</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-            {['all', '区域 A', '区域 B', '区域 C'].map(r => (
-              <button key={r} className="desktop-btn" style={{
-                padding: '4px 10px', fontSize: 11, borderRadius: 99,
-                background: searchFilter.region === r ? 'var(--accent)' : undefined,
-                color: searchFilter.region === r ? '#fff' : undefined,
-                borderColor: searchFilter.region === r ? 'var(--accent)' : undefined,
-              }} onClick={() => setSearchFilter(prev => ({ ...prev, region: r }))}>{r === 'all' ? '全部' : r}</button>
+              }} onClick={() => setSearchFilter(prev => ({ ...prev, type: t }))}>{t === 'all' ? '全部' : t}</button>
             ))}
           </div>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>状态</div>
           <div style={{ display: 'flex', gap: 4 }}>
-            {[{ v: 'all', l: '全部' }, { v: 'pending', l: '待采集' }, { v: 'done', l: '已采集' }, { v: 'dup', l: '重复' }].map(s => (
+            {[{ v: 'all', l: '全部' }, { v: 'done', l: '已采集' }, { v: 'pending', l: '待采集' }].map(s => (
               <button key={s.v} className="desktop-btn" style={{
                 padding: '4px 10px', fontSize: 11, borderRadius: 99,
                 background: searchFilter.status === s.v ? 'var(--accent)' : undefined,
@@ -210,15 +227,18 @@ function DesktopApp() {
         </div>
         <div style={{ padding: '4px 14px', fontSize: 11, color: 'var(--muted)' }}>{filteredPois.length} 条结果</div>
         <div className="scroll">
+          {collectedPois.length === 0 && (
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>
+              {collection.taskId ? '数据加载中...' : '暂无采集数据'}
+            </div>
+          )}
           {filteredPois.map((p, i) => (
             <div key={i} className="desktop-poi-row" onClick={() => { setSelectedPoi(p); setView('detail'); }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.category} · {p.address}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.category || '—'} · {p.address || '—'}</div>
               </div>
-              <span className={`badge ${p.status === 'done' ? 'badge-success' : 'badge-accent'}`}>
-                {p.status === 'done' ? '已采集' : '待采集'}
-              </span>
+              <span className="badge badge-success">已采集</span>
             </div>
           ))}
         </div>
@@ -229,63 +249,85 @@ function DesktopApp() {
     </div>
   );
 
-  const renderProgressView = () => (
-    <div style={{ padding: 20, maxWidth: 800, margin: '0 auto', width: '100%', overflow: 'auto' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-        <div className="stat-card"><div className="v">142</div><div className="l">总数 · 区域 A+B+C</div></div>
-        <div className="stat-card"><div className="v" style={{ color: 'var(--accent)' }}>87</div><div className="l">已采集 · 61.3% 完成</div></div>
-        <div className="stat-card"><div className="v">55</div><div className="l">待采集 · 剩余</div></div>
-        <div className="stat-card"><div className="v" style={{ color: 'var(--warn)' }}>3</div><div className="l">重复 · 需处理</div></div>
-      </div>
-      <div style={{ marginBottom: 20 }}>
-        {MOCK_REGIONS.map(r => {
-          const pct = Math.round((r.done / r.total) * 100);
-          return (
+  const renderProgressView = () => {
+    const { doneCells, totalCells, totalPois } = collection.progress;
+    const totalAll = totalCells > 0 ? totalCells * 3 : collection.totalPois;
+    const done = collectedPois.length || doneCells * 3 || 0;
+    const remaining = Math.max(totalAll - done, 0);
+    const pct = totalAll > 0 ? Math.round((done / totalAll) * 100) : 0;
+
+    return (
+      <div style={{ padding: 20, maxWidth: 800, margin: '0 auto', width: '100%', overflow: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+          <div className="stat-card"><div className="v">{totalAll || '—'}</div><div className="l">总数</div></div>
+          <div className="stat-card"><div className="v" style={{ color: 'var(--accent)' }}>{done}</div><div className="l">已采集 · {pct}% 完成</div></div>
+          <div className="stat-card"><div className="v">{remaining}</div><div className="l">待采集 · 剩余</div></div>
+          <div className="stat-card"><div className="v" style={{ color: 'var(--warn)' }}>{duplicateCount}</div><div className="l">重复 · 需处理</div></div>
+        </div>
+        {regionStats.map(r => {
+          const rPct = Math.round((r.done / Math.max(r.total, 1)) * 100);
+          return r.done > 0 ? (
             <div key={r.name} style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 12 }}>
                 <span style={{ fontWeight: 500 }}>{r.name}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{r.done}/{r.total}</span>
               </div>
               <div style={{ height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)', borderRadius: 3 }} />
+                <div style={{ height: '100%', width: `${rPct}%`, background: 'var(--accent)', borderRadius: 3 }} />
               </div>
+              {r.cats.length > 0 && (
+                <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>
+                  {r.cats.map(c => <span key={c.n}>{c.n}: {c.c} 条</span>)}
+                </div>
+              )}
             </div>
-          );
+          ) : null;
         })}
+        {collectedPois.length > 0 && (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>
+              {['商户名称', '类别', '地址', '坐标', '状态'].map(h => <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {collectedPois.slice(0, 100).map((p, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '6px 8px', fontSize: 12 }}>{p.name}</td>
+                  <td style={{ padding: '6px 8px', color: 'var(--muted)', fontSize: 11 }}>{p.category || '—'}</td>
+                  <td style={{ padding: '6px 8px', color: 'var(--muted)', fontSize: 11, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address || '—'}</td>
+                  <td style={{ padding: '6px 8px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{p.lng?.toFixed(4)},{p.lat?.toFixed(4)}</td>
+                  <td style={{ padding: '6px 8px' }}><span className="badge badge-success">已采集</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {collectedPois.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)', fontSize: 13 }}>
+            {collection.taskId ? '数据加载中...' : '暂无数据，请先在地图工作台执行采集'}
+          </div>
+        )}
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-        <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>
-          {['商户名称', '类型', '区域', '地址', '状态', '采集时间'].map(h => <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>)}
-        </tr></thead>
-        <tbody>
-          {MOCK_POIS.map((p, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-              <td style={{ padding: '8px' }}>{p.name}</td>
-              <td style={{ padding: '8px', color: 'var(--muted)' }}>{p.category}</td>
-              <td style={{ padding: '8px', color: 'var(--muted)' }}>{p.address.includes('高新区') ? '区域 A' : p.address.includes('锦江') ? '区域 B' : '区域 C'}</td>
-              <td style={{ padding: '8px', color: 'var(--muted)', fontSize: 11 }}>{p.address}</td>
-              <td style={{ padding: '8px' }}><span className={`badge ${p.status === 'done' ? 'badge-success' : 'badge-accent'}`}>{p.status === 'done' ? '已采集' : '待采集'}</span></td>
-              <td style={{ padding: '8px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{p.status === 'done' ? `06-13 09:${String(12 - i * 4).padStart(2, '0')}` : '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+    );
+  };
 
   const renderDetailView = () => (
     <div style={{ display: 'flex', height: '100%' }}>
       <div className="desktop-data-list">
         <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', fontSize: 14, fontWeight: 600 }}>商户列表</div>
         <div className="scroll">
-          {MOCK_POIS.map((p, i) => (
-            <div key={i} className="desktop-poi-row" style={{ background: selectedPoi?.name === p.name ? 'var(--accent-dim)' : undefined }}
+          {collectedPois.length === 0 && (
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>
+              {collection.taskId ? '数据加载中...' : '暂无采集数据'}
+            </div>
+          )}
+          {collectedPois.map((p, i) => (
+            <div key={i} className="desktop-poi-row" style={{ background: selectedPoi?.id === p.id ? 'var(--accent-dim)' : undefined }}
               onClick={() => setSelectedPoi(p)}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.address}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.address || '—'}</div>
               </div>
-              <span className={`badge ${p.status === 'done' ? 'badge-success' : 'badge-accent'}`}>{p.status === 'done' ? '已采集' : '待采集'}</span>
+              <span className="badge badge-success">已采集</span>
             </div>
           ))}
         </div>
@@ -296,15 +338,13 @@ function DesktopApp() {
       <div style={{ flex: 1, padding: 20 }}>
         {selectedPoi ? (
           <div className="card" style={{ maxWidth: 500 }}>
-            <span className={`badge ${selectedPoi.status === 'done' ? 'badge-success' : 'badge-accent'}`} style={{ marginBottom: 8, display: 'inline-block' }}>
-              {selectedPoi.category}
-            </span>
+            <span className="badge badge-accent" style={{ marginBottom: 8, display: 'inline-block' }}>{selectedPoi.category}</span>
             <h2 style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', marginBottom: 12 }}>{selectedPoi.name}</h2>
             {[
-              ['地址', selectedPoi.address],
-              ['POI ID', 'B0FFGXXXXX'],
-              ['电话', '028-8888 8888'],
-              ['坐标', '104.05827, 30.54286'],
+              ['地址', selectedPoi.address || '—'],
+              ['POI ID', selectedPoi.id || '—'],
+              ['电话', selectedPoi.phone || '—'],
+              ['坐标', `${selectedPoi.lng?.toFixed(5)},${selectedPoi.lat?.toFixed(5)}`],
             ].map(([k, v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
                 <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.03em', fontSize: 11 }}>{k}</span>
@@ -312,8 +352,8 @@ function DesktopApp() {
               </div>
             ))}
             <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-              <button className="desktop-btn primary">📞 拨打电话</button>
-              <button className="desktop-btn">📍 在地图中查看</button>
+              {selectedPoi.phone && <a href={`tel:${selectedPoi.phone}`} className="desktop-btn primary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>📞 拨打电话</a>}
+              <button className="desktop-btn" style={{ flex: 1 }}>📍 在地图中查看</button>
             </div>
           </div>
         ) : (
@@ -325,58 +365,86 @@ function DesktopApp() {
     </div>
   );
 
+  const handleUpload = async () => {
+    if (!collectedPois.length) return;
+    setSyncStatus('syncing');
+    try {
+      const cats = [...new Set(collectedPois.map(p => p.category))].join(',');
+      const taskId = await createCloudTask({ categories: cats, total_cells: 0, total_pois: collectedPois.length });
+      await insertCloudPois(taskId, collectedPois.map(p => ({
+        name: p.name, category: p.category || '', subcategory: p.subcategory || '',
+        address: p.address || '', lng: p.lng, lat: p.lat, phone: p.phone || '',
+      })));
+      setSyncStatus('done');
+      showToast(`已上传 ${collectedPois.length} 条到云端`, 'success');
+    } catch (e: any) {
+      setSyncStatus('error');
+      showToast(e?.message || '上传失败', 'error');
+    }
+  };
+
   const renderManageView = () => (
     <div style={{ padding: 20, maxWidth: 800, margin: '0 auto', width: '100%', overflow: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        {/* Cloud upload */}
         <div className="card">
           <div style={{ fontSize: 28, marginBottom: 4 }}>☁</div>
           <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>云端上传</h3>
           <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>将已采集数据上传至云端服务器，支持增量同步。</p>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button className="desktop-btn primary" style={{ flex: 1, justifyContent: 'center' }}>上传全部 (87条)</button>
-            <button className="desktop-btn" style={{ flex: 1, justifyContent: 'center' }}>仅上传增量 (12条)</button>
+            <button className="desktop-btn primary" style={{ flex: 1, justifyContent: 'center' }}
+              onClick={handleUpload} disabled={collectedPois.length === 0 || syncStatus === 'syncing'}>
+              {syncStatus === 'syncing' ? '上传中...' : syncStatus === 'done' ? '✅ 已上传' : syncStatus === 'error' ? '❌ 重试' : `上传全部 (${collectedPois.length}条)`}
+            </button>
           </div>
-          <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>上次同步：2026-06-13 09:42:15</p>
+          {syncStatus === 'done' && <p style={{ fontSize: 10, color: 'var(--success)', marginTop: 6 }}>上传成功</p>}
         </div>
-        {/* Export */}
         <div className="card">
           <div style={{ fontSize: 28, marginBottom: 4 }}>📥</div>
           <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>数据导出</h3>
-          <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>导出为 Excel (.xlsx) 或 CSV 格式，支持按区域筛选导出。</p>
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>导出为 Excel (.xlsx) 或 GeoJSON 格式。</p>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button className="desktop-btn primary" style={{ flex: 1, justifyContent: 'center' }}>导出 Excel</button>
-            <button className="desktop-btn" style={{ flex: 1, justifyContent: 'center' }}>导出 CSV</button>
+            <button className="desktop-btn primary" style={{ flex: 1, justifyContent: 'center' }}
+              disabled={!collection.taskId} onClick={() => window.open(getExportUrl(collection.taskId!, 'xlsx'), '_blank')}>
+              导出 Excel
+            </button>
+            <button className="desktop-btn" style={{ flex: 1, justifyContent: 'center' }}
+              disabled={!collection.taskId} onClick={() => window.open(getExportUrl(collection.taskId!, 'geojson'), '_blank')}>
+              导出 GeoJSON
+            </button>
           </div>
-          <button className="desktop-btn" style={{ width: '100%', marginTop: 6, justifyContent: 'center' }}>按区域导出</button>
         </div>
       </div>
-      {/* Region storage */}
       <div className="card" style={{ marginBottom: 12 }}>
         <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>📊 按区域存储</h3>
-        <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>已采集数据按地图区域分组存储，避免跨区域重复采集。</p>
-        {MOCK_REGIONS.map(r => (
-          <div key={r.name} style={{ marginBottom: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+        <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>已采集数据按类别分组统计。</p>
+        {regionStats.map(r => (
+          <div key={r.name} style={{ marginBottom: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
               <span style={{ fontSize: 13, fontWeight: 500 }}>{r.name}</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)' }}>{r.done} 条 · {Math.round((r.done / r.total) * 100)}%</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)' }}>{r.done} 条 · {Math.round((r.done / Math.max(r.total, 1)) * 100)}%</span>
             </div>
             <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--muted)' }}>
               {r.cats.map(c => <span key={c.n}>{c.n}: {c.c} 条</span>)}
             </div>
           </div>
         ))}
+        {collectedPois.length === 0 && <p style={{ fontSize: 12, color: 'var(--muted)', padding: 12 }}>暂无数据</p>}
       </div>
-      {/* Duplicate detection */}
       <div className="card">
         <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>🔄 重复检测</h3>
         <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>采集前自动比对已存储数据，避免同一商户被重复采集。</p>
-        <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>最近检测到 {MOCK_DUPS.length} 条重复记录：</p>
-        {MOCK_DUPS.map((d, i) => (
-          <div key={i} style={{ fontSize: 12, padding: '6px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 4, marginBottom: 4 }}>
-            ▲ {d}
-          </div>
-        ))}
+        {duplicateCount > 0 ? (
+          <>
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>最近检测到 {duplicateCount} 条重复记录：</p>
+            {collectedPois.filter((p, i, arr) => arr.findIndex(x => x.name === p.name && x.address === p.address) !== i).slice(0, 5).map((p, i) => (
+              <div key={i} style={{ fontSize: 12, padding: '6px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 4, marginBottom: 4 }}>
+                ▲ {p.name} — 重复于当前区域
+              </div>
+            ))}
+          </>
+        ) : (
+          <p style={{ fontSize: 12, color: 'var(--muted)' }}>{collectedPois.length > 0 ? '未检测到重复记录 ✓' : '暂无数据'}</p>
+        )}
       </div>
     </div>
   );
@@ -401,19 +469,35 @@ function DesktopApp() {
       <div className="card" style={{ marginBottom: 14 }}>
         <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>⚙ 采集参数</h4>
         <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>POI 类型范围</label>
-          <select className="input-field" defaultValue="all"><option>全部类型</option><option>仅餐饮</option></select>
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>搜索半径 · 1,000m</label>
-          <input type="range" defaultValue={1000} min={100} max={5000} step={100} style={{ width: '100%', accentColor: 'var(--accent)' }} />
+          <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            搜索半径 · {localStorage.getItem('amap_search_radius') || '1000'}m
+          </label>
+          <input type="range" defaultValue={Number(localStorage.getItem('amap_search_radius')) || 1000} min={100} max={5000} step={100}
+            style={{ width: '100%', accentColor: 'var(--accent)' }}
+            onChange={e => { localStorage.setItem('amap_search_radius', e.target.value); e.target.parentElement!.querySelector('label')!.textContent = `搜索半径 · ${e.target.value}m`; }} />
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-          <div style={{ flex: 1 }}><label style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 3, textTransform: 'uppercase' }}>单次请求上限</label><input className="input-field" defaultValue={25} type="number" /></div>
-          <div style={{ flex: 1 }}><label style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 3, textTransform: 'uppercase' }}>请求间隔 (ms)</label><input className="input-field" defaultValue={200} type="number" /></div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 3, textTransform: 'uppercase' }}>单次请求上限</label>
+            <input className="input-field" type="number" defaultValue={localStorage.getItem('amap_page_size') || '25'}
+              onChange={e => localStorage.setItem('amap_page_size', e.target.value)} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 3, textTransform: 'uppercase' }}>请求间隔 (ms)</label>
+            <input className="input-field" type="number" defaultValue={localStorage.getItem('amap_request_delay') || '200'}
+              onChange={e => localStorage.setItem('amap_request_delay', e.target.value)} />
+          </div>
         </div>
-        <div className="desktop-set-row"><span>自动跳过重复项</span><div className="desktop-toggle on" onClick={(e: any) => e.currentTarget.classList.toggle('on')} /></div>
-        <div className="desktop-set-row"><span>采集完成后自动上传</span><div className="desktop-toggle" onClick={(e: any) => e.currentTarget.classList.toggle('on')} /></div>
+        <div className="desktop-set-row">
+          <span>自动跳过重复项</span>
+          <div className={`desktop-toggle ${localStorage.getItem('amap_skip_dup') !== 'false' ? 'on' : ''}`}
+            onClick={e => { const t = e.currentTarget; t.classList.toggle('on'); localStorage.setItem('amap_skip_dup', t.classList.contains('on') ? 'true' : 'false'); }} />
+        </div>
+        <div className="desktop-set-row">
+          <span>采集完成后自动上传</span>
+          <div className={`desktop-toggle ${localStorage.getItem('amap_auto_upload') === 'true' ? 'on' : ''}`}
+            onClick={e => { const t = e.currentTarget; t.classList.toggle('on'); localStorage.setItem('amap_auto_upload', t.classList.contains('on') ? 'true' : 'false'); }} />
+        </div>
       </div>
       <div className="card">
         <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>📋 版本管理</h4>
