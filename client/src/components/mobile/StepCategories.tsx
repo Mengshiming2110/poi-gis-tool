@@ -23,22 +23,13 @@ function StepCategories({ selected, onChange }: Props) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 16 }}>
+    <div className="mobile-panel-block">
       <input
         type="text"
-        placeholder="搜索类别..."
+        placeholder="搜索类别"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{
-          padding: '14px 16px',
-          border: '2px solid #e2e8f0',
-          borderRadius: 12,
-          fontSize: 16,
-          outline: 'none',
-          marginBottom: 16,
-          width: '100%',
-          boxSizing: 'border-box' as const,
-        }}
+        className="mobile-search-input"
       />
       <div className="category-cloud">
         {filtered.map((c) => (
@@ -52,8 +43,8 @@ function StepCategories({ selected, onChange }: Props) {
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 'auto', textAlign: 'center', fontSize: 14, color: '#94a3b8', padding: 16 }}>
-        已选 {selected.length} 个类别
+      <div className="mobile-helper-text">
+        已选 {selected.length} 个类别。建议一次选择 1-3 类，能明显节省 API 调用。
       </div>
     </div>
   );

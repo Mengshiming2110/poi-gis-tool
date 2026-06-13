@@ -137,55 +137,36 @@ function StepResults({ pois, categories, onRestart }: Props) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '16px', borderBottom: '1px solid #e2e8f0',
-      }}>
-        <span style={{ fontSize: 16, fontWeight: 700 }}>采集结果 ({pois.length})</span>
-      </div>
-
-      {/* Export buttons */}
-      <div style={{ display: 'flex', gap: 8, padding: '12px 16px', flexWrap: 'wrap', borderBottom: '1px solid #f1f5f9' }}>
+    <div className="results-panel">
+      <div className="results-hero">
+        <div>
+          <span>采集结果</span>
+          <strong>{pois.length}</strong>
+          <em>条 POI</em>
+        </div>
         <button
           className="mobile-btn mobile-btn-primary"
-          style={{ padding: '8px 16px', fontSize: 13, width: 'auto', background: syncState === 'done' ? '#22c55e' : syncState === 'error' ? '#ef4444' : undefined }}
           onClick={handleSync}
-          disabled={syncState === 'syncing' || syncState === 'done'}
+          disabled={syncState === 'syncing' || syncState === 'done' || pois.length === 0}
         >
-          {syncState === 'syncing' ? '⏳ 同步中' : syncState === 'done' ? '✅ 已同步' : syncState === 'error' ? '❌ 重试' : '☁️ 同步云端'}
-        </button>
-        <button className="mobile-btn mobile-btn-secondary" style={{ padding: '8px 16px', fontSize: 13, width: 'auto' }}
-          onClick={handleShare}>
-          📤 分享
-        </button>
-        <button className="mobile-btn mobile-btn-secondary" style={{ padding: '8px 16px', fontSize: 13, width: 'auto' }}
-          onClick={handleCopy}>
-          {copied ? '✅ 已复制' : '📋 复制CSV'}
-        </button>
-        <button className="mobile-btn mobile-btn-secondary" style={{ padding: '8px 16px', fontSize: 13, width: 'auto' }}
-          onClick={handleCSV}>
-          📄 保存CSV
-        </button>
-        <button className="mobile-btn mobile-btn-secondary" style={{ padding: '8px 16px', fontSize: 13, width: 'auto' }}
-          onClick={handleGeoJSON}>
-          🗺 GeoJSON
+          {syncState === 'syncing' ? '同步中' : syncState === 'done' ? '已同步' : syncState === 'error' ? '重试同步' : '同步到桌面端'}
         </button>
       </div>
+
       {syncMsg && (
-        <div style={{
-          padding: '6px 16px', fontSize: 12, textAlign: 'center',
-          color: syncState === 'done' ? '#16a34a' : syncState === 'error' ? '#dc2626' : '#3b82f6',
-          background: syncState === 'done' ? '#f0fdf4' : syncState === 'error' ? '#fef2f2' : '#eff6ff',
-          borderBottom: '1px solid #f1f5f9',
-        }}>
+        <div className={`results-sync-message ${syncState}`}>
           {syncMsg}
         </div>
       )}
 
-      {/* POI list */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div className="results-tools">
+        <button onClick={handleShare}>分享</button>
+        <button onClick={handleCopy}>{copied ? '已复制' : '复制CSV'}</button>
+        <button onClick={handleCSV}>保存CSV</button>
+        <button onClick={handleGeoJSON}>GeoJSON</button>
+      </div>
+
+      <div className="results-list">
         {pois.length === 0 && (
           <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 14 }}>
             暂无数据
@@ -204,7 +185,7 @@ function StepResults({ pois, categories, onRestart }: Props) {
         ))}
       </div>
 
-      <div className="mobile-footer">
+      <div className="mobile-action-row">
         <button className="mobile-btn mobile-btn-primary" onClick={onRestart}>完成</button>
       </div>
     </div>

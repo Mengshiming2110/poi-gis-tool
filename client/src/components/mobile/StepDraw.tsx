@@ -1,6 +1,12 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { DrawMode, DrawnShape } from '../../hooks/useAmap';
 
+const DRAW_TOOLS: Array<{ mode: Exclude<DrawMode, null>; label: string; hint: string; icon: string }> = [
+  { mode: 'polygon', label: '自由区域', hint: '点按地图添加边界点，完成后自动生成区域', icon: '⬠' },
+  { mode: 'rectangle', label: '矩形范围', hint: '点一次设起点，再点一次完成矩形', icon: '▭' },
+  { mode: 'circle', label: '圆形范围', hint: '点一次设中心，再点一次设半径', icon: '◯' },
+];
+
 interface Props {
   loaded: boolean;
   drawnShape: DrawnShape | null;
@@ -44,38 +50,43 @@ function StepDraw({ loaded, drawnShape, setDrawMode: applyMode, clearDrawings, g
   }, [drawnShape]);
 
   return (
-    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
-      {/* Status badge */}
+    <div className="mobile-panel-block">
       {drawnShape && (
-        <div style={{
-          margin: '0 auto 8px', width: 'fit-content',
-          background: '#22c55e', color: '#fff', padding: '6px 16px',
-          borderRadius: 20, fontSize: 13, fontWeight: 600, pointerEvents: 'auto',
-        }}>
-          区域已绘制
+        <div className="mobile-success-strip">
+          区域已选中，可以继续生成网格
         </div>
       )}
-      {/* Loading */}
+
       {!loaded && (
-        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 8 }}>地图加载中...</div>
+        <div className="mobile-helper-text">地图加载中...</div>
       )}
-      {/* Draw tools */}
-      <div className="draw-tools" style={{ pointerEvents: 'auto' }}>
-        {(['polygon', 'rectangle', 'circle'] as DrawMode[]).map((m) => (
+
+      <div className="draw-tools">
+        {DRAW_TOOLS.map((tool) => (
           <button
-            key={m}
-            className={`draw-btn ${drawMode === m ? 'active' : ''}`}
-            onClick={() => selectMode(m)}
+            key={tool.mode}
+            className={`draw-btn ${drawMode === tool.mode ? 'active' : ''}`}
+            onClick={() => selectMode(tool.mode)}
             disabled={!loaded}
           >
-            {m === 'polygon' ? '⬠' : m === 'rectangle' ? '▭' : '◯'}
+            <span className="draw-icon">{tool.icon}</span>
+            <span>{tool.label}</span>
           </button>
         ))}
-        <button className="draw-btn" style={{ color: '#ef4444' }}
-          onClick={() => { clearDrawings(); onShapeChange(null); }} disabled={!loaded}>
-          ✕
-        </button>
       </div>
+
+      <div className="mobile-helper-text">
+        {drawMode
+          ? DRAW_TOOLS.find((tool) => tool.mode === drawMode)?.hint
+          : drawnShape
+            ? '需要调整时可重新选择绘制方式，旧区域会被替换。'
+            : '先选择一种绘制方式，再在地图上操作。'}
+      </div>
+
+      <button className="mobile-text-action"
+        onClick={() => { clearDrawings(); onShapeChange(null); }} disabled={!loaded || !drawnShape}>
+        清除当前区域
+      </button>
     </div>
   );
 }

@@ -105,10 +105,10 @@ function StepCollect({ categories, gridCells, collectPOIsClientSide, stopCollect
   // Error / empty state
   if (resolved && error) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 24 }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-        <div style={{ fontSize: 14, color: '#ef4444', textAlign: 'center', marginBottom: 8, maxWidth: 280 }}>{error}</div>
-        <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', marginBottom: 24 }}>
+      <div className="collect-panel">
+        <div className="collect-error-icon">!</div>
+        <div className="collect-error-text">{error}</div>
+        <div className="mobile-helper-text">
           已完成 {done}/{total} 个搜索任务
         </div>
         <button className="mobile-btn mobile-btn-primary" onClick={() => onComplete([])}>
@@ -119,8 +119,8 @@ function StepCollect({ categories, gridCells, collectPOIsClientSide, stopCollect
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 24 }}>
-      <div className="collect-ring" style={{ position: 'relative' }}>
+    <div className="collect-panel">
+      <div className="collect-ring">
         <svg width="200" height="200" viewBox="0 0 200 200" style={{ position: 'absolute', top: -8, left: -8 }}>
           <circle cx="100" cy="100" r="92" fill="none" stroke="#e2e8f0" strokeWidth="8" />
           <circle cx="100" cy="100" r="92" fill="none" stroke={status === 'done' ? '#22c55e' : '#3b82f6'} strokeWidth="8"
@@ -137,18 +137,18 @@ function StepCollect({ categories, gridCells, collectPOIsClientSide, stopCollect
         </span>
       </div>
 
-      <div style={{ marginTop: 12, color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
+      <div className="mobile-helper-text">
         预计最多调用高德 {estimatedRequests} 次；已缓存网格会自动跳过
       </div>
 
-      <div style={{ display: 'flex', gap: 40, marginTop: 32 }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>{poiCount}</div>
-          <div style={{ fontSize: 13, color: '#94a3b8' }}>POI</div>
+      <div className="collect-stats">
+        <div>
+          <strong>{poiCount}</strong>
+          <span>POI</span>
         </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>{done}/{total}</div>
-          <div style={{ fontSize: 13, color: '#94a3b8' }}>搜索任务</div>
+        <div>
+          <strong>{done}/{total}</strong>
+          <span>请求进度</span>
         </div>
       </div>
 
