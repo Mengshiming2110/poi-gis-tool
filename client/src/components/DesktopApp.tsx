@@ -166,6 +166,33 @@ function DesktopApp() {
     return () => { cancelled = true; };
   }, [collection.taskId, collection.status]);
 
+  // Show POI markers on map when data or view changes
+  useEffect(() => {
+    if (collectedPois.length > 0 && drawAPIRef.current) {
+      drawAPIRef.current.showPoiMarkers(
+        collectedPois.map(p => ({
+          lng: p.lng, lat: p.lat,
+          name: p.name,
+          color: CAT_COLOR[p.category] || 'var(--accent)',
+        }))
+      );
+    }
+  }, [collectedPois]);
+  // Re-show markers when switching to map view (map may have resized/re-initialized)
+  useEffect(() => {
+    if (view === 'map' && collectedPois.length > 0 && drawAPIRef.current) {
+      setTimeout(() => {
+        drawAPIRef.current?.showPoiMarkers(
+          collectedPois.map(p => ({
+            lng: p.lng, lat: p.lat,
+            name: p.name,
+            color: CAT_COLOR[p.category] || 'var(--accent)',
+          }))
+        );
+      }, 300);
+    }
+  }, [view]);
+
   // Computed stats from real data
   const { regionStats, duplicateCount } = useMemo(() => {
     const byCategory: Record<string, number> = {};

@@ -23,6 +23,8 @@ export interface MapAPI {
   gridCells: GridCell[];
   collectPOIsClientSide: (cells: GridCell[], categories: string[], categoryNames: Record<string, string>, gridSizeMeters: number, onCellProgress: (done: number, total: number, pois: number) => void) => Promise<any[]>;
   stopCollecting: () => void;
+  showPoiMarkers: (pois: { lng: number; lat: number; name: string; color: string }[]) => void;
+  clearPoiMarkers: () => void;
   poiData: any[];
   isCollecting: boolean;
 }
@@ -47,6 +49,8 @@ function MapView({ children, onMapReady, onShapeChange, onGridChange }: MapViewP
           gridCells: amap.gridCells,
           collectPOIsClientSide: amap.collectPOIsClientSide,
           stopCollecting: amap.stopCollecting,
+          showPoiMarkers: amap.showPoiMarkers,
+          clearPoiMarkers: amap.clearPoiMarkers,
           poiData: amap.poiData,
           isCollecting: amap.isCollecting,
         });

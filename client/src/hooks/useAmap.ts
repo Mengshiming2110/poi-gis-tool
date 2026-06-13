@@ -618,8 +618,55 @@ export function useAmap(containerId: string) {
     }
   }, []);
 
+  // POI markers on map
+  const showPoiMarkers = useCallback((pois: { lng: number; lat: number; name: string; color: string }[]) => {
+    const inst = mapRef.current;
+    if (!inst || !window.AMap) return;
+    // Clear existing
+    poiMarkersRef.current.forEach(m => { try { inst.remove(m); } catch {} });
+    poiMarkersRef.current = [];
+
+    pois.forEach(p => {
+      const marker = new window.AMap.Marker({
+        position: new window.AMap.LngLat(p.lng, p.lat),
+        anchor: 'center',
+        offset: new window.AMap.Pixel(0, 0),
+        content: `<div title="${p.name.replace(/"/g, '&quot;')}" style="
+          width:10px;height:10px;border-radius:50%;
+          background:${p.color};border:2px solid #fff;
+          box-shadow:0 1px 3px rgba(0,0,0,0.3);
+          cursor:pointer;
+        "></div>`,
+      });
+      marker.on('click', () => {
+        marker.setContent(`<div style="
+          background:#fff;color:#1e293b;padding:3px 8px;border-radius:4px;
+          font-size:11px;white-space:nowrap;
+          box-shadow:0 2px 8px rgba(0,0,0,0.15);
+          border:1px solid #e2e8f0;
+        ">${p.name}</div>`);
+        setTimeout(() => {
+          marker.setContent(`<div style="
+            width:10px;height:10px;border-radius:50%;
+            background:${p.color};border:2px solid #fff;
+            box-shadow:0 1px 3px rgba(0,0,0,0.3);
+            cursor:pointer;
+          "></div>`);
+        }, 2500);
+      });
+      marker.setMap(inst);
+      poiMarkersRef.current.push(marker);
+    });
+  }, []);
+
+  const clearPoiMarkers = useCallback(() => {
+    poiMarkersRef.current.forEach(m => { try { mapRef.current?.remove(m); } catch {} });
+    poiMarkersRef.current = [];
+  }, []);
+
   return { map, loaded, getBounds, setDrawMode, clearDrawings, getDrawnShape, splitGrid,
            drawMode, drawnShape, gridCells, locateMe, flyTo,
+           showPoiMarkers, clearPoiMarkers,
            collectPOIsClientSide, stopCollecting, poiData, isCollecting };
 }
 
