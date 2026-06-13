@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import MapView from './MapView';
-import DrawToolbar from './DrawToolbar';
 import SettingsDialog from './SettingsDialog';
 import CloudPanel from './CloudPanel';
 import UpdatePrompt from './UpdatePrompt';
@@ -132,19 +131,40 @@ function DesktopApp() {
   const renderMapView = () => (
     <div className="desktop-map-view">
       <MapView onMapReady={handleMapReady} onShapeChange={handleShapeChange} onGridChange={setGridCells}>
-        {/* Left toolbar: draw tools */}
-        {drawnShape === null && (
-          <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <DrawToolbar
-              activeMode={drawMode}
-              onModeChange={setDrawMode}
-              onClear={() => { drawAPIRef.current?.clearDrawings(); setDrawMode(null); setDrawnShape(null); setGridCells([]); }}
-              setDrawMode={(m) => drawAPIRef.current?.setDrawMode(m)}
-            />
-          </div>
-        )}
         {/* Right panel: config */}
         <div className="desktop-map-panel">
+          <div className="card">
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: 6 }}>绘制工具</div>
+            <div style={{ display: 'flex', gap: 3 }}>
+              {([
+                { id: 'rectangle' as const, label: '□ 矩形' },
+                { id: 'polygon' as const, label: '⬠ 多边形' },
+                { id: 'circle' as const, label: '○ 圆形' },
+              ]).map(m => (
+                <button key={m.id}
+                  className="desktop-btn"
+                  style={{
+                    flex: 1, justifyContent: 'center', fontSize: 11,
+                    background: drawMode === m.id ? 'var(--accent)' : undefined,
+                    color: drawMode === m.id ? '#fff' : undefined,
+                    borderColor: drawMode === m.id ? 'var(--accent)' : undefined,
+                  }}
+                  onClick={() => {
+                    if (drawMode === m.id) { setDrawMode(null); drawAPIRef.current?.setDrawMode(null); }
+                    else { setDrawMode(m.id); drawAPIRef.current?.setDrawMode(m.id); }
+                  }}
+                >{m.label}</button>
+              ))}
+              <button className="desktop-btn" style={{
+                justifyContent: 'center', fontSize: 11, color: 'var(--warn)',
+              }} onClick={() => { drawAPIRef.current?.clearDrawings(); setDrawMode(null); setDrawnShape(null); setGridCells([]); }}>✕</button>
+            </div>
+            {drawnShape && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--success)' }}>
+                ✓ 已绘制 {drawnShape.type === 'circle' ? `圆形 (r${Math.round(drawnShape.geometry.radius)}m)` : drawnShape.type}
+              </div>
+            )}
+          </div>
           <div className="card">
             <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: 6 }}>POI 分类</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>

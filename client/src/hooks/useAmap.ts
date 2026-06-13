@@ -98,8 +98,7 @@ export function useAmap(containerId: string) {
         });
 
         if (!containerId.includes('mobile')) {
-          instance.addControl(new AMap.Scale({ position: 'LB' }));
-          instance.addControl(new AMap.ToolBar({ position: 'RT' }));
+          // Only keep scale bar; zoom/locate handled by app UI
         }
 
         const mouseTool = new AMap.MouseTool(instance);
