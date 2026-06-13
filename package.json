@@ -38,6 +38,11 @@
       "target": "nsis",
       "icon": null
     },
+    "publish": {
+      "provider": "github",
+      "owner": "Mengshiming2110",
+      "repo": "poi-gis-tool"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true

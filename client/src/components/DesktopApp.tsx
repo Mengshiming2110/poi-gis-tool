@@ -1,13 +1,15 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import MapView from './MapView';
 import ControlPanel from './ControlPanel';
 import DrawToolbar from './DrawToolbar';
 import ProgressDrawer from './ProgressDrawer';
 import SettingsDialog from './SettingsDialog';
 import CloudPanel from './CloudPanel';
+import UpdatePrompt from './UpdatePrompt';
 import { useCollection } from '../hooks/useCollection';
 import { useSSE } from '../hooks/useSSE';
 import { getExportUrl } from '../services/api';
+import { checkForUpdate, type UpdateInfo } from '../services/updater';
 import type { TaskMode } from '../types/poi';
 import type { DrawMode, MapAPI, DrawnShape, GridCell } from './MapView';
 import '../App.css';
@@ -21,6 +23,11 @@ function DesktopApp() {
   const [drawnShape, setDrawnShape] = useState<DrawnShape | null>(null);
   const [gridCells, setGridCells] = useState<GridCell[]>([]);
   const [toast, setToast] = useState<{ msg: string; type: 'info' | 'success' | 'error' } | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+
+  useEffect(() => {
+    checkForUpdate().then((info) => { if (info.available) setUpdateInfo(info); });
+  }, []);
 
   const drawAPIRef = useRef<MapAPI | null>(null);
   const collection = useCollection();
@@ -136,6 +143,15 @@ function DesktopApp() {
           background: toast.type === 'error' ? '#ef4444' : toast.type === 'success' ? '#22c55e' : '#1e293b',
           boxShadow: '0 4px 16px rgba(0,0,0,0.15)', pointerEvents: 'none',
         }}>{toast.msg}</div>
+      )}
+
+      {updateInfo && (
+        <UpdatePrompt
+          version={updateInfo.version}
+          url={updateInfo.url}
+          body={updateInfo.body}
+          onDismiss={() => setUpdateInfo(null)}
+        />
       )}
     </>
   );

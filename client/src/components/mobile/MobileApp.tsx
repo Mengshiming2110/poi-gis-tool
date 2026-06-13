@@ -4,7 +4,10 @@ import StepDraw from './StepDraw';
 import StepGrid from './StepGrid';
 import StepCollect from './StepCollect';
 import StepResults from './StepResults';
+import MobileSettings from './MobileSettings';
+import UpdatePrompt from '../UpdatePrompt';
 import { useAmap, type DrawnShape } from '../../hooks/useAmap';
+import { checkForUpdate, type UpdateInfo } from '../../services/updater';
 import { CATEGORY_LIST } from '../../types/poi';
 
 const PANEL_COPY = [
@@ -21,6 +24,12 @@ function MobileApp() {
   const [drawnShape, setDrawnShape] = useState<DrawnShape | null>(null);
   const [poiData, setPoiData] = useState<any[]>([]);
   const [locating, setLocating] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+
+  useEffect(() => {
+    checkForUpdate().then((info) => { if (info.available) setUpdateInfo(info); });
+  }, []);
 
   // Single shared map instance for steps 2-3
   const amap = useAmap('mobile-map');
@@ -93,15 +102,25 @@ function MobileApp() {
         <div className={`mobile-sheet ${step >= 4 ? 'mobile-sheet-tall' : ''}`}>
           <div className="mobile-sheet-handle" />
           <div className="mobile-sheet-head">
-            <div>
-              <div className="mobile-sheet-title">{PANEL_COPY[step - 1].title}</div>
-              <div className="mobile-sheet-subtitle">{PANEL_COPY[step - 1].hint}</div>
-            </div>
-            {step > 1 && selectedNames.length > 0 && (
-              <div className="mobile-mini-summary">
-                {selectedNames.slice(0, 2).join('、')}{selectedNames.length > 2 ? `等 ${selectedNames.length} 类` : ''}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div className="mobile-sheet-title">{PANEL_COPY[step - 1].title}</div>
+                <div className="mobile-sheet-subtitle">{PANEL_COPY[step - 1].hint}</div>
               </div>
-            )}
+              {step > 1 && selectedNames.length > 0 && (
+                <div className="mobile-mini-summary">
+                  {selectedNames.slice(0, 2).join('、')}{selectedNames.length > 2 ? `等 ${selectedNames.length} 类` : ''}
+                </div>
+              )}
+              <button
+                onClick={() => setSettingsOpen(true)}
+                style={{
+                  border: 'none', background: '#f1f5f9', borderRadius: '50%',
+                  width: 36, height: 36, fontSize: 18, cursor: 'pointer', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >⚙</button>
+            </div>
           </div>
 
           <div className="mobile-sheet-content">
@@ -152,6 +171,17 @@ function MobileApp() {
           )}
         </div>
       </div>
+
+      <MobileSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {updateInfo && (
+        <UpdatePrompt
+          version={updateInfo.version}
+          url={updateInfo.url}
+          body={updateInfo.body}
+          onDismiss={() => setUpdateInfo(null)}
+        />
+      )}
     </div>
   );
 }
