@@ -4,7 +4,7 @@ import UpdatePrompt from './UpdatePrompt';
 import { useCollection } from '../hooks/useCollection';
 import { useSSE } from '../hooks/useSSE';
 import { getExportUrl, queryPois } from '../services/api';
-import { createCloudTask, insertCloudPois, getTasks, type CloudTask } from '../services/supabase';
+import { createCloudTask, insertCloudPois, getTasks, getPois, type CloudTask } from '../services/supabase';
 import { checkForUpdate, CURRENT_VERSION, RELEASES_URL, type UpdateInfo } from '../services/updater';
 import { CATEGORY_LIST, type PoiRecord } from '../types/poi';
 import type { MapAPI, DrawnShape, GridCell } from './MapView';
@@ -167,29 +167,24 @@ function DesktopApp() {
   }, [collection.taskId, collection.status]);
 
   // Show POI markers on map when data or view changes
+  const buildMarkers = (pois: typeof collectedPois) => pois.map(p => ({
+    lng: p.lng, lat: p.lat,
+    name: p.name,
+    category: catName(p.category),
+    address: p.address || undefined,
+    phone: p.phone || undefined,
+    color: CAT_COLOR[p.category] || 'var(--accent)',
+  }));
+
   useEffect(() => {
     if (collectedPois.length > 0 && drawAPIRef.current) {
-      drawAPIRef.current.showPoiMarkers(
-        collectedPois.map(p => ({
-          lng: p.lng, lat: p.lat,
-          name: p.name,
-          color: CAT_COLOR[p.category] || 'var(--accent)',
-        }))
-      );
+      drawAPIRef.current.showPoiMarkers(buildMarkers(collectedPois));
     }
   }, [collectedPois]);
-  // Re-show markers when switching to map view (map may have resized/re-initialized)
+
   useEffect(() => {
     if (view === 'map' && collectedPois.length > 0 && drawAPIRef.current) {
-      setTimeout(() => {
-        drawAPIRef.current?.showPoiMarkers(
-          collectedPois.map(p => ({
-            lng: p.lng, lat: p.lat,
-            name: p.name,
-            color: CAT_COLOR[p.category] || 'var(--accent)',
-          }))
-        );
-      }, 300);
+      setTimeout(() => { drawAPIRef.current?.showPoiMarkers(buildMarkers(collectedPois)); }, 300);
     }
   }, [view]);
 
@@ -624,9 +619,26 @@ function DesktopApp() {
                     {new Date(t.created_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <div style={{ color: 'var(--muted)', fontSize: 11 }}>
-                  {t.total_pois} 条 POI · {t.status === 'done' ? '✅ 已完成' : t.status}
-                  <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>{t.id.slice(0, 8)}</span>
+                <div style={{ color: 'var(--muted)', fontSize: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{t.total_pois} 条 POI · {t.status === 'done' ? '✅ 已完成' : t.status}</span>
+                  <button className="desktop-btn" style={{ padding: '2px 10px', fontSize: 10 }}
+                    onClick={async () => {
+                      try {
+                        const cloudPois = await getPois(t.id);
+                        const mapped = cloudPois.map((cp: any) => ({
+                          id: cp.id, task_id: cp.task_id,
+                          name: cp.name, category: cp.category || '',
+                          subcategory: cp.subcategory || '', address: cp.address || '',
+                          lng: cp.lng, lat: cp.lat, phone: cp.phone || '',
+                          rating: cp.rating, collected_at: cp.created_at || new Date().toISOString(),
+                        })) as any[];
+                        setCollectedPois(mapped);
+                        showToast(`已导入 ${mapped.length} 条云端POI`, 'success');
+                        setView('map');
+                      } catch (e: any) { showToast('导入失败: ' + (e?.message || '未知错误'), 'error'); }
+                    }}>
+                    📥 导入到本地
+                  </button>
                 </div>
               </div>
             ))

@@ -23,7 +23,7 @@ export interface MapAPI {
   gridCells: GridCell[];
   collectPOIsClientSide: (cells: GridCell[], categories: string[], categoryNames: Record<string, string>, gridSizeMeters: number, onCellProgress: (done: number, total: number, pois: number) => void) => Promise<any[]>;
   stopCollecting: () => void;
-  showPoiMarkers: (pois: { lng: number; lat: number; name: string; color: string }[]) => void;
+  showPoiMarkers: (pois: { lng: number; lat: number; name: string; category: string; address?: string; phone?: string; color: string }[]) => void;
   clearPoiMarkers: () => void;
   poiData: any[];
   isCollecting: boolean;
