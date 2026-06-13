@@ -1,14 +1,17 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useAmap, type DrawMode, type DrawnShape } from '../../hooks/useAmap';
+import type { DrawMode, DrawnShape } from '../../hooks/useAmap';
 
 interface Props {
+  loaded: boolean;
   drawnShape: DrawnShape | null;
+  setDrawMode: (mode: DrawMode) => void;
+  clearDrawings: () => void;
+  getDrawnShape: () => DrawnShape | null;
   onShapeChange: (shape: DrawnShape | null) => void;
 }
 
-function StepDraw({ drawnShape, onShapeChange }: Props) {
+function StepDraw({ loaded, drawnShape, setDrawMode: applyMode, clearDrawings, getDrawnShape, onShapeChange }: Props) {
   const [drawMode, setDrawMode] = useState<DrawMode>(null);
-  const { loaded, setDrawMode: applyMode, clearDrawings, getDrawnShape } = useAmap('mobile-draw-map');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const selectMode = useCallback(
@@ -21,7 +24,7 @@ function StepDraw({ drawnShape, onShapeChange }: Props) {
         applyMode(mode);
       }
     },
-    [drawMode, applyMode]
+    [drawMode, applyMode],
   );
 
   // Poll for drawn shape
@@ -29,7 +32,7 @@ function StepDraw({ drawnShape, onShapeChange }: Props) {
     if (!loaded) return;
     pollRef.current = setInterval(() => {
       const shape = getDrawnShape();
-      if (shape && (!drawnShape || shape.type !== drawnShape.type)) {
+      if (shape && (!drawnShape || shape.overlay !== drawnShape.overlay)) {
         onShapeChange(shape);
       }
     }, 500);
@@ -37,35 +40,35 @@ function StepDraw({ drawnShape, onShapeChange }: Props) {
   }, [loaded, drawnShape, getDrawnShape, onShapeChange]);
 
   return (
-    <div style={{ position: 'relative', height: '100%' }}>
-      <div id="mobile-draw-map" style={{ width: '100%', height: '100%' }} />
+    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
+      {/* Status badge */}
       {drawnShape && (
-        <div
-          style={{
-            position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
-            background: '#22c55e', color: '#fff', padding: '8px 20px',
-            borderRadius: 20, fontSize: 14, fontWeight: 600,
-            zIndex: 50,
-          }}
-        >
+        <div style={{
+          margin: '0 auto 8px', width: 'fit-content',
+          background: '#22c55e', color: '#fff', padding: '6px 16px',
+          borderRadius: 20, fontSize: 13, fontWeight: 600, pointerEvents: 'auto',
+        }}>
           区域已绘制
         </div>
       )}
-      <div className="draw-tools">
+      {/* Loading */}
+      {!loaded && (
+        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 8 }}>地图加载中...</div>
+      )}
+      {/* Draw tools */}
+      <div className="draw-tools" style={{ pointerEvents: 'auto' }}>
         {(['polygon', 'rectangle', 'circle'] as DrawMode[]).map((m) => (
           <button
             key={m}
             className={`draw-btn ${drawMode === m ? 'active' : ''}`}
             onClick={() => selectMode(m)}
+            disabled={!loaded}
           >
             {m === 'polygon' ? '⬠' : m === 'rectangle' ? '▭' : '◯'}
           </button>
         ))}
-        <button
-          className="draw-btn"
-          style={{ color: '#ef4444' }}
-          onClick={() => { clearDrawings(); onShapeChange(null); }}
-        >
+        <button className="draw-btn" style={{ color: '#ef4444' }}
+          onClick={() => { clearDrawings(); onShapeChange(null); }} disabled={!loaded}>
           ✕
         </button>
       </div>
