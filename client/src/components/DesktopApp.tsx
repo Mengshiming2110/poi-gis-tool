@@ -197,8 +197,10 @@ function DesktopApp() {
   }, [gridSizeMeters, showToast]);
   const handleStart = useCallback(() => {
     const bounds = drawAPIRef.current?.getBounds() || { southwest: { lng: 116.3, lat: 39.8 }, northeast: { lng: 116.5, lat: 40.0 } };
+    const amapKey = (localStorage.getItem('amap_rest_key') || '').trim();
     const skipDuplicates = localStorage.getItem('amap_skip_dup') !== 'false';
-    collection.start({ mode: 'region', categories: selectedCategories, bounds, gridSize: gridSizeMeters / 111320, skipDuplicates });
+    if (!amapKey) { showToast('请先在系统设置中配置高德 Web 服务 Key', 'error'); return; }
+    collection.start({ mode: 'region', categories: selectedCategories, bounds, gridSize: gridSizeMeters / 111320, skipDuplicates, amapKey });
     setView('progress');
     showToast('开始采集', 'info');
   }, [selectedCategories, gridSizeMeters, collection, showToast]);

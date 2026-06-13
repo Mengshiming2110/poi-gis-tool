@@ -5,10 +5,10 @@ const STORAGE_REST_KEY = 'amap_rest_key';
 const DEFAULT_REST_KEY = '';
 
 const STORAGE_JS_KEY = 'amap_js_key';
-const DEFAULT_JS_KEY = '35f0e1144644fbfba405c109db466cdc';
+const DEFAULT_JS_KEY = '';
 
 const STORAGE_SECURITY = 'amap_security_code';
-const DEFAULT_SECURITY = '8d13a7d3f6ecff69f02dc1dea5855b0a';
+const DEFAULT_SECURITY = '';
 
 function load() {
   return {
