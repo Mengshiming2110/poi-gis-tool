@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>POI GIS 采集 · 移动端</title>
+<style>
+/* ── Tokens ── */
+:root {
+  --bg:      oklch(99% 0.002 240);
+  --surface: oklch(100% 0 0);
+  --fg:      oklch(18% 0.012 250);
+  --muted:   oklch(54% 0.012 250);
+  --border:  oklch(92% 0.005 250);
+  --accent:  oklch(58% 0.18 255);
+  --accent-dim: oklch(58% 0.18 255 / 0.08);
+  --success: oklch(58% 0.15 145);
+  --warn:    oklch(58% 0.16 35);
+  --font:    -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --tab-h: 56px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --status-h: 44px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:var(--font);font-size:14px;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;user-select:none}
+/* ── App shell ── */
+.app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;position:relative;overflow:hidden;background:var(--bg)}
+/* ── Status bar ── */
+.status-bar{
+  height:var(--status-h);display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;font-size:11px;font-weight:600;color:var(--fg);
+  background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.status-bar .title{font-size:15px;font-weight:600;letter-spacing:-0.01em}
+.status-bar .badge{
+  font-size:10px;font-family:var(--font-mono);color:var(--accent);
+  background:var(--accent-dim);padding:3px 8px;border-radius:99px;
+}
+/* ── Screen container ── */
+.screens{flex:1;position:relative;overflow:hidden}
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;flex-direction:column;-webkit-overflow-scrolling:touch}
+.screen.active{display:flex}
+/* ═══════════ TAB 1: 地图 ═══════════ */
+.map-wrap{flex:1;position:relative;background:oklch(97% 0.006 240)}
+.map-grid{
+  width:100%;height:100%;
+  background:
+    linear-gradient(rgba(0,0,0,0.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,0,0,0.035) 1px,transparent 1px);
+  background-size:36px 36px;
+  position:relative;
+}
+.road-h{position:absolute;height:2px;background:oklch(92% 0.004 240);left:0;right:0}
+.road-v{position:absolute;width:2px;background:oklch(92% 0.004 240);top:0;bottom:0}
+.map-lbl{position:absolute;font-family:var(--font-mono);font-size:9px;color:var(--muted);opacity:0.5;pointer-events:none;white-space:nowrap}
+/* POI dots — smaller for mobile */
+.poi-dot{
+  position:absolute;width:22px;height:22px;border-radius:50% 50% 50% 0;
+  background:var(--accent);transform:translate(-11px,-22px) rotate(-45deg);
+  box-shadow:0 2px 5px rgba(0,0,0,0.18);z-index:2;cursor:pointer;
+  transition:transform .15s;
+}
+.poi-dot::after{content:'';width:6px;height:6px;background:#fff;border-radius:50%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(45deg)}
+.poi-dot.done{background:var(--success)}
+/* Selection area */
+.sel-area{
+  position:absolute;border:2px dashed var(--accent);
+  background:oklch(58% 0.18 255 / 0.05);
+  left:22%;top:18%;width:50%;height:45%;border-radius:4px;pointer-events:none;z-index:1;
+}
+.sel-tag{
+  position:absolute;top:-20px;left:0;font-size:10px;font-weight:600;color:var(--accent);
+  background:var(--surface);padding:2px 8px;border-radius:4px;border:1px solid var(--accent);white-space:nowrap;
+}
+/* Floating action buttons */
+.map-fab{
+  position:absolute;right:12px;display:flex;flex-direction:column;gap:8px;z-index:5;
+}
+.map-fab.top{top:12px}
+.map-fab.bottom{bottom:12px}
+.fab{
+  width:40px;height:40px;border-radius:50%;border:1px solid var(--border);
+  background:var(--surface);box-shadow:0 2px 8px rgba(0,0,0,0.08);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:18px;color:var(--fg);
+}
+.fab.accent{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 4px 14px oklch(58% 0.18 255 / 0.35)}
+.fab svg{width:18px;height:18px}
+/* Mini legend */
+.map-legend-mob{
+  position:absolute;bottom:12px;left:12px;z-index:5;
+  display:flex;gap:10px;font-size:10px;color:var(--muted);
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:99px;padding:5px 12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);
+}
+.map-legend-mob span{display:flex;align-items:center;gap:4px}
+.map-legend-mob .dot{width:6px;height:6px;border-radius:50%}
+.map-legend-mob .dot.pend{background:var(--accent)}
+.map-legend-mob .dot.done{background:var(--success)}
+/* ── Bottom sheet overlay ── */
+.sheet-overlay{
+  position:absolute;inset:0;background:rgba(0,0,0,0.3);z-index:20;display:none;
+  transition:opacity .2s;
+}
+.sheet-overlay.show{display:block}
+.sheet{
+  position:absolute;bottom:0;left:0;right:0;z-index:21;
+  background:var(--surface);border-radius:16px 16px 0 0;
+  max-height:70vh;overflow-y:auto;display:none;
+  box-shadow:0 -4px 24px rgba(0,0,0,0.1);
+  transform:translateY(100%);transition:transform .25s ease;
+}
+.sheet.show{display:block;transform:translateY(0)}
+.sheet-handle{width:32px;height:4px;background:var(--border);border-radius:2px;margin:10px auto 14px}
+.sheet-title{font-size:15px;font-weight:600;padding:0 16px 12px;text-align:center;letter-spacing:-0.01em}
+.sheet-body{padding:0 16px 24px}
+/* Region type config inside sheet */
+.cfg-section{margin-bottom:16px}
+.cfg-section h4{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);margin-bottom:8px}
+.cfg-chips{display:flex;flex-wrap:wrap;gap:6px}
+.cfg-chip{
+  padding:8px 14px;border-radius:99px;font-size:13px;
+  border:1px solid var(--border);background:var(--bg);color:var(--muted);
+  cursor:pointer;min-height:40px;display:flex;align-items:center;
+}
+.cfg-chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.cfg-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.cfg-row .lbl{font-size:13px}
+.cfg-row .val{font-size:13px;color:var(--muted);font-family:var(--font-mono)}
+.cfg-preview{
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 12px;font-size:11px;font-family:var(--font-mono);color:var(--muted);
+  word-break:break-all;margin-top:8px;
+}
+/* ═══════════ TAB 2: 数据 ═══════════ */
+.data-screen{padding:12px}
+.search-bar{
+  display:flex;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:10px 14px;margin-bottom:12px;
+}
+.search-bar:focus-within{border-color:var(--accent)}
+.search-bar svg{width:16px;height:16px;color:var(--muted);flex-shrink:0}
+.search-bar input{
+  flex:1;border:none;outline:none;font-size:14px;background:transparent;color:var(--fg);
+  font-family:var(--font);
+}
+.search-bar input::placeholder{color:var(--muted)}
+.filter-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch}
+.filter-row::-webkit-scrollbar{display:none}
+.pill{
+  padding:7px 14px;border-radius:99px;font-size:12.5px;white-space:nowrap;
+  border:1px solid var(--border);background:var(--surface);color:var(--muted);
+  cursor:pointer;flex-shrink:0;min-height:36px;display:flex;align-items:center;
+}
+.pill.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* POI card list */
+.poi-cards{display:flex;flex-direction:column;gap:8px}
+.poi-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px;cursor:pointer;
+}
+.poi-card .n{font-size:15px;font-weight:600;margin-bottom:4px}
+.poi-card .a{font-size:12px;color:var(--muted);margin-bottom:6px}
+.poi-card .tags{display:flex;gap:6px;align-items:center}
+.tag{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:500}
+.tag.c{background:var(--accent-dim);color:var(--accent)}
+.tag.n{background:oklch(58% 0.18 255 / 0.1);color:var(--accent)}
+.tag.d{background:oklch(58% 0.15 145 / 0.1);color:var(--success)}
+/* POI detail push screen */
+.detail-push{
+  position:absolute;inset:0;background:var(--bg);z-index:10;display:none;flex-direction:column;
+  transform:translateX(100%);transition:transform .25s ease;
+}
+.detail-push.show{display:flex;transform:translateX(0)}
+.detail-push-header{
+  display:flex;align-items:center;gap:12px;padding:12px 16px;
+  border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;
+}
+.detail-push-header button{
+  width:36px;height:36px;border-radius:50%;border:1px solid var(--border);
+  background:var(--surface);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--fg);font-size:16px;flex-shrink:0;
+}
+.detail-push-header .t{font-size:15px;font-weight:600;letter-spacing:-0.01em}
+.detail-push-body{flex:1;overflow-y:auto;padding:16px}
+.detail-info-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;margin-bottom:12px;
+}
+.detail-info-card .cat-badge{
+  display:inline-block;padding:3px 10px;background:var(--accent-dim);
+  color:var(--accent);border-radius:99px;font-size:11px;margin-bottom:10px;
+}
+.detail-info-card h2{font-size:20px;font-weight:600;letter-spacing:-0.02em;margin-bottom:12px}
+.info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-row .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.03em}
+.info-row .v{font-size:14px;text-align:right;font-family:var(--font-mono)}
+.detail-actions{display:flex;gap:8px}
+.detail-actions button{
+  flex:1;padding:12px;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface);color:var(--fg);
+  font-family:var(--font);min-height:44px;
+}
+.detail-actions button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* ═══════════ TAB 3: 进度 ═══════════ */
+.progress-screen{padding:12px}
+.stat-mini-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.stat-mini{
+  padding:14px;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);text-align:center;
+}
+.stat-mini .v{font-size:26px;font-weight:600;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.stat-mini .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.03em}
+.progress-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px;margin-bottom:12px;
+}
+.progress-card h4{font-size:14px;font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between}
+.progress-card h4 .pct{font-size:13px;color:var(--accent)}
+.progress-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:12px}
+.progress-fill{height:100%;background:var(--accent);border-radius:3px}
+.log-list{display:flex;flex-direction:column;gap:6px}
+.log-item{
+  padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+  display:flex;justify-content:space-between;align-items:center;font-size:13px;
+}
+.log-item .api{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.log-item .ok{color:var(--success);font-weight:600}
+.log-item .err{color:var(--warn);font-weight:600}
+/* ═══════════ TAB 4: 设置 ═══════════ */
+.settings-screen{padding:12px}
+.set-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px;margin-bottom:12px;
+}
+.set-card h4{font-size:14px;font-weight:600;letter-spacing:-0.01em;margin-bottom:12px}
+.set-field{margin-bottom:12px}
+.set-field label{font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.03em}
+.set-field input,.set-field select{
+  width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  font-size:14px;color:var(--fg);background:var(--bg);font-family:var(--font);outline:none;
+}
+.set-field input:focus,.set-field select:focus{border-color:var(--accent)}
+.set-row{
+  display:flex;align-items:center;justify-content:space-between;padding:12px 0;
+  border-bottom:1px solid var(--border);
+}
+.set-row:last-child{border-bottom:none}
+.set-row .lbl{font-size:14px}
+.toggle-sw{
+  width:46px;height:26px;border-radius:13px;background:var(--border);
+  position:relative;cursor:pointer;flex-shrink:0;transition:background .2s;
+}
+.toggle-sw::after{
+  content:'';width:22px;height:22px;border-radius:50%;background:#fff;
+  position:absolute;top:2px;left:2px;transition:transform .2s;
+}
+.toggle-sw.on{background:var(--accent)}
+.toggle-sw.on::after{transform:translateX(20px)}
+/* Version list */
+.ver-list{list-style:none}
+.ver-list li{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+  padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;
+}
+.ver-list li:last-child{border-bottom:none}
+.ver-list .ver{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--accent)}
+.ver-list .desc{flex:1;color:var(--fg)}
+.ver-list .dt{font-family:var(--font-mono);font-size:10px;color:var(--muted)}
+/* Update check */
+.update-row{display:flex;align-items:center;gap:10px;padding:10px 0}
+.update-row .vnow{font-size:22px;font-weight:600;letter-spacing:-0.02em;font-family:var(--font-mono)}
+.update-row .ustat{font-size:12px;color:var(--muted)}
+/* ═══════════ Bottom Tab Bar ═══════════ */
+.tab-bar{
+  height:calc(var(--tab-h) + var(--safe-bottom));
+  padding-bottom:var(--safe-bottom);
+  display:flex;align-items:center;background:var(--surface);
+  border-top:1px solid var(--border);flex-shrink:0;z-index:30;
+}
+.tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;cursor:pointer;padding:6px 0;color:var(--muted);min-height:48px;
+  border:none;background:none;font-family:var(--font);transition:color .12s;
+}
+.tab.active{color:var(--accent)}
+.tab svg{width:22px;height:22px}
+.tab span{font-size:10px;font-weight:500}
+/* ── Responsive: wider phones / landscape ── */
+@media(min-width:431px){
+  .app{max-width:430px;border-left:1px solid var(--border);border-right:1px solid var(--border)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span class="title" id="screenTitle">地图工作台</span>
+    <span class="badge">v2.2.0</span>
+  </div>
+
+  <!-- Screens -->
+  <div class="screens">
+
+    <!-- ══ TAB 1: 地图 ══ -->
+    <div class="screen active" id="scr-map">
+      <div class="map-wrap">
+        <div class="map-grid">
+          <div class="road-h" style="top:28%"></div>
+          <div class="road-h" style="top:58%"></div>
+          <div class="road-v" style="left:32%"></div>
+          <div class="road-v" style="left:64%"></div>
+          <span class="map-lbl" style="top:6px;left:10px">南三环</span>
+          <span class="map-lbl" style="top:6px;left:30%">科华路</span>
+          <span class="map-lbl" style="top:6px;left:62%">天府大道</span>
+          <span class="map-lbl" style="left:8px;top:26%">一环</span>
+          <span class="map-lbl" style="left:8px;top:56%">二环</span>
+          <!-- POIs -->
+          <div class="poi-dot" style="left:20%;top:30%" onclick="openDetailPush(0)"></div>
+          <div class="poi-dot done" style="left:33%;top:26%" onclick="openDetailPush(2)"></div>
+          <div class="poi-dot" style="left:46%;top:40%" onclick="openDetailPush(1)"></div>
+          <div class="poi-dot done" style="left:56%;top:33%" onclick="openDetailPush(3)"></div>
+          <div class="poi-dot" style="left:66%;top:50%" onclick="openDetailPush(0)"></div>
+          <div class="poi-dot done" style="left:28%;top:53%" onclick="openDetailPush(4)"></div>
+          <div class="poi-dot" style="left:52%;top:60%"></div>
+          <div class="poi-dot" style="left:73%;top:38%"></div>
+          <div class="poi-dot done" style="left:40%;top:16%"></div>
+          <div class="poi-dot" style="left:60%;top:20%"></div>
+          <!-- Selection zone -->
+          <div class="sel-area"><span class="sel-tag">区域A · 高新区南</span></div>
+        </div>
+        <!-- FABs: zoom + locate controls -->
+        <div class="map-fab top">
+          <button class="fab">+</button>
+          <button class="fab">−</button>
+          <button class="fab" onclick="locateMap()" title="定位当前位置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="10" stroke-dasharray="2 2"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/></svg>
+          </button>
+        </div>
+        <!-- FABs: bottom actions -->
+        <div class="map-fab bottom">
+          <button class="fab accent" onclick="openSheet('config')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 2"/></svg>
+          </button>
+        </div>
+        <div class="map-legend-mob">
+          <span><span class="dot pend"></span>待拉取</span>
+          <span><span class="dot done"></span>已拉取</span>
+        </div>
+      </div>
+      <!-- Sheet: region config -->
+      <div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
+      <div class="sheet" id="sheetConfig">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">区域 & 类型配置</div>
+        <div class="sheet-body">
+          <div class="cfg-section">
+            <h4>圈选工具</h4>
+            <div class="cfg-chips">
+              <span class="cfg-chip on" onclick="toggleChip(this)">□ 矩形</span>
+              <span class="cfg-chip" onclick="toggleChip(this)">⬠ 多边形</span>
+              <span class="cfg-chip" onclick="toggleChip(this)">○ 圆形</span>
+            </div>
+          </div>
+          <div class="cfg-section">
+            <h4>POI 分类</h4>
+            <div class="cfg-chips" id="poiCats">
+              <span class="cfg-chip on" data-cat="restaurant" onclick="togglePoiCat(this)">餐饮</span>
+              <span class="cfg-chip" data-cat="retail" onclick="togglePoiCat(this)">零售</span>
+              <span class="cfg-chip" data-cat="service" onclick="togglePoiCat(this)">生活服务</span>
+              <span class="cfg-chip" data-cat="hotel" onclick="togglePoiCat(this)">酒店</span>
+              <span class="cfg-chip" data-cat="transport" onclick="togglePoiCat(this)">交通</span>
+              <span class="cfg-chip" data-cat="edu" onclick="togglePoiCat(this)">教育</span>
+              <span class="cfg-chip" data-cat="medical" onclick="togglePoiCat(this)">医疗</span>
+              <span class="cfg-chip" data-cat="gov" onclick="togglePoiCat(this)">政府机构</span>
+            </div>
+          </div>
+          <div class="cfg-section">
+            <h4>目标区域</h4>
+            <select style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:var(--bg);color:var(--fg);font-family:var(--font)">
+              <option>区域 A — 高新区南</option>
+              <option>区域 B — 锦江区</option>
+              <option>区域 C — 青羊区</option>
+            </select>
+          </div>
+          <div class="cfg-row"><span class="lbl">搜索半径</span><span class="val">1,000m</span></div>
+          <div class="cfg-row"><span class="lbl">预估请求次数</span><span class="val">~12 次</span></div>
+          <div class="cfg-row"><span class="lbl">预估 POI 数量</span><span class="val">~280 条</span></div>
+          <div class="cfg-preview">
+            GET /v3/place/polygon?types=050000|060000&polygon=104.058,30.542|...
+          </div>
+          <button onclick="closeSheet();startPull()" style="width:100%;margin-top:16px;padding:14px;border-radius:var(--radius-sm);font-size:15px;font-weight:600;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:var(--font)">▶ 开始拉取</button>
+        </div>
+      </div>
+      <!-- Sheet: pull progress overlay -->
+      <div class="sheet" id="sheetPull">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">拉取进度</div>
+        <div class="sheet-body" id="pullLog"></div>
+      </div>
+    </div>
+
+    <!-- ══ TAB 2: 数据 ══ -->
+    <div class="screen" id="scr-data">
+      <div class="data-screen">
+        <div class="search-bar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></svg>
+          <input type="text" placeholder="搜索商户名称、地址…" id="mobSearch" oninput="filterMobCards()">
+        </div>
+        <div class="filter-row">
+          <span class="pill on" data-cat="all" onclick="toggleMobFilter(this)">全部</span>
+          <span class="pill" data-cat="restaurant" onclick="toggleMobFilter(this)">餐饮</span>
+          <span class="pill" data-cat="retail" onclick="toggleMobFilter(this)">零售</span>
+          <span class="pill" data-cat="service" onclick="toggleMobFilter(this)">生活服务</span>
+          <span class="pill" data-cat="hotel" onclick="toggleMobFilter(this)">酒店</span>
+          <span class="pill" data-cat="entertain" onclick="toggleMobFilter(this)">娱乐</span>
+        </div>
+        <div class="poi-cards" id="mobPoiCards"></div>
+      </div>
+      <!-- Detail push screen -->
+      <div class="detail-push" id="detailPush">
+        <div class="detail-push-header">
+          <button onclick="closeDetailPush()">←</button>
+          <span class="t" id="detailPushTitle">商户详情</span>
+        </div>
+        <div class="detail-push-body" id="detailPushBody"></div>
+      </div>
+    </div>
+
+    <!-- ══ TAB 3: 进度 ══ -->
+    <div class="screen" id="scr-progress">
+      <div class="progress-screen">
+        <div class="stat-mini-row">
+          <div class="stat-mini"><div class="v">142</div><div class="l">总数</div></div>
+          <div class="stat-mini"><div class="v" style="color:var(--accent)">87</div><div class="l">已拉取 61.3%</div></div>
+          <div class="stat-mini"><div class="v">55</div><div class="l">待拉取</div></div>
+          <div class="stat-mini"><div class="v" style="color:var(--warn)">3</div><div class="l">重复</div></div>
+        </div>
+        <div class="progress-card">
+          <h4>区域 A — 高新区<span class="pct">42/56 · 75%</span></h4>
+          <div class="progress-track"><div class="progress-fill" style="width:75%"></div></div>
+          <div class="log-list">
+            <div class="log-item"><span>川西坝子火锅</span><span class="api">餐饮</span><span class="ok">已拉取</span></div>
+            <div class="log-item"><span>蜀九香火锅</span><span class="api">餐饮</span><span class="ok">已拉取</span></div>
+            <div class="log-item"><span>巴蜀风川菜</span><span class="api">餐饮</span><span class="err">待拉取</span></div>
+          </div>
+        </div>
+        <div class="progress-card">
+          <h4>区域 B — 锦江区<span class="pct">30/48 · 62.5%</span></h4>
+          <div class="progress-track"><div class="progress-fill" style="width:62.5%"></div></div>
+          <div class="log-list">
+            <div class="log-item"><span>永辉超市</span><span class="api">零售</span><span class="ok">已拉取</span></div>
+            <div class="log-item"><span>海底捞火锅</span><span class="api">餐饮</span><span class="ok">已拉取</span></div>
+            <div class="log-item"><span>家乐福</span><span class="api">零售</span><span class="err">待拉取</span></div>
+          </div>
+        </div>
+        <div class="progress-card">
+          <h4>区域 C — 青羊区<span class="pct">15/38 · 39.5%</span></h4>
+          <div class="progress-track"><div class="progress-fill" style="width:39.5%"></div></div>
+          <div class="log-list">
+            <div class="log-item"><span>龙抄手小吃</span><span class="api">餐饮</span><span class="ok">已拉取</span></div>
+            <div class="log-item"><span>麦当劳</span><span class="api">餐饮</span><span class="ok">已拉取</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TAB 4: 设置 ══ -->
+    <div class="screen" id="scr-settings">
+      <div class="settings-screen">
+        <div class="set-card">
+          <h4>🔑 高德开放平台 API</h4>
+          <div class="set-field"><label>API Key (Web服务)</label><input type="text" value="····························"></div>
+          <div class="set-field"><label>API Key (JS API)</label><input type="text" placeholder="输入高德 JS API Key"></div>
+          <div class="set-row"><span class="lbl">使用代理转发</span><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+        </div>
+        <div class="set-card">
+          <h4>⚙ 拉取参数</h4>
+          <div class="set-field"><label>POI 类型范围</label><select><option>全部类型</option><option>仅餐饮</option><option>自定义组合</option></select></div>
+          <div class="set-row"><span class="lbl">搜索半径</span><span style="color:var(--muted)">1,000m</span></div>
+          <div class="set-row"><span class="lbl">单次请求上限</span><span style="color:var(--muted)">25 条</span></div>
+          <div class="set-row"><span class="lbl">请求间隔</span><span style="color:var(--muted)">200ms</span></div>
+          <div class="set-row"><span class="lbl">自动跳过重复</span><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="set-row"><span class="lbl">拉取完自动上传</span><div class="toggle-sw" onclick="this.classList.toggle('on')"></div></div>
+        </div>
+        <div class="set-card">
+          <h4>📋 版本管理</h4>
+          <div class="update-row">
+            <span class="vnow">v2.2.0</span>
+            <span class="ustat" id="updateStatus">✓ 已是最新</span>
+          </div>
+          <button onclick="checkUpdate()" style="width:100%;padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--fg);cursor:pointer;font-family:var(--font);font-size:14px">🔄 检查更新</button>
+          <p style="font-size:11px;color:var(--muted);margin-top:6px" id="lastCheck">上次检查：2026-06-13 10:30</p>
+          <div class="set-row"><span class="lbl">启动时自动检查</span><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+          <ul class="ver-list" style="margin-top:12px">
+            <li><span class="ver">v2.2.0</span><span class="desc">新增检查更新功能</span><span class="dt">06-13</span></li>
+            <li><span class="ver">v2.1.0</span><span class="desc">按区域分组存储、重复检测优化</span><span class="dt">06-10</span></li>
+            <li><span class="ver">v2.0.3</span><span class="desc">修复坐标偏移、暗色适配</span><span class="dt">05-28</span></li>
+            <li><span class="ver">v2.0.0</span><span class="desc">重构采集引擎、Excel 导出</span><span class="dt">05-15</span></li>
+            <li><span class="ver">v1.5.2</span><span class="desc">新增云端上传、进度可视化</span><span class="dt">04-20</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ Bottom Tab Bar ═══════════ -->
+  <nav class="tab-bar">
+    <button class="tab active" data-tab="map">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+      <span>地图</span>
+    </button>
+    <button class="tab" data-tab="data">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v5c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 11v5c0 1.66 3.58 3 8 3s8-1.34 8-3v-5"/></svg>
+      <span>数据</span>
+    </button>
+    <button class="tab" data-tab="progress">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      <span>进度</span>
+    </button>
+    <button class="tab" data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4"/></svg>
+      <span>设置</span>
+    </button>
+  </nav>
+</div>
+
+<script>
+/* ── Tab switching ── */
+const tabNames = {map:'地图工作台',data:'数据浏览',progress:'拉取进度',settings:'系统设置'};
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const t = tab.dataset.tab;
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('scr-' + t).classList.add('active');
+    document.getElementById('screenTitle').textContent = tabNames[t];
+    document.getElementById('scr-' + t).scrollTop = 0;
+  });
+});
+
+/* ── Sheet open/close ── */
+function openSheet(type) {
+  document.getElementById('sheetOverlay').classList.add('show');
+  document.getElementById('sheet' + (type === 'config' ? 'Config' : 'Pull')).classList.add('show');
+}
+function closeSheet() {
+  document.getElementById('sheetOverlay').classList.remove('show');
+  document.querySelectorAll('.sheet.show').forEach(s => s.classList.remove('show'));
+}
+
+/* ── Chip toggles ── */
+function toggleChip(el) { el.classList.toggle('on') }
+function togglePoiCat(el) { el.classList.toggle('on') }
+function toggleMobFilter(el) {
+  if (el.dataset.cat === 'all') {
+    el.parentElement.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
+    el.classList.add('on');
+  } else {
+    el.parentElement.querySelector('.pill[data-cat="all"]')?.classList.remove('on');
+    el.classList.toggle('on');
+    const anyOn = el.parentElement.querySelectorAll('.pill.on').length;
+    if (!anyOn) el.parentElement.querySelector('.pill[data-cat="all"]')?.classList.add('on');
+  }
+  filterMobCards();
+}
+
+/* ── Start pull (simulate) ── */
+function startPull() {
+  const sheet = document.getElementById('sheetPull');
+  const log = document.getElementById('pullLog');
+  log.innerHTML = '<p style="color:var(--accent);font-weight:600">🔄 正在通过高德 API 拉取 POI 数据…</p>';
+  sheet.classList.add('show');
+  const entries = [
+    {name:'川西坝子火锅',ok:true},{name:'蜀九香火锅',ok:true},{name:'巴蜀风川菜',ok:true},
+    {name:'星巴克咖啡',ok:true},{name:'全家便利店',ok:false},{name:'屈臣氏',ok:true},
+  ];
+  let i = 0;
+  const iv = setInterval(() => {
+    if (i >= entries.length) {
+      clearInterval(iv);
+      log.innerHTML += '<p style="color:var(--success);font-weight:600;margin-top:8px">✓ 拉取完成 — 获取 5 条，跳过 1 条重复</p>';
+      return;
+    }
+    const e = entries[i];
+    log.innerHTML += '<div class="log-item" style="margin-top:4px"><span>'+e.name+'</span><span class="api">API 第'+(i+1)+'次</span><span class="'+(e.ok?'ok':'err')+'">'+(e.ok?'✓ 已拉取':'⚠ 重复跳过')+'</span></div>';
+    i++;
+  }, 600);
+}
+
+/* ── Mobile POI cards ── */
+const mobPois = [
+  {n:'川西坝子火锅',a:'高新区天府三街288号',cat:'restaurant',catCN:'餐饮',done:false},
+  {n:'蜀九香火锅',a:'高新区天府大道1199号',cat:'restaurant',catCN:'餐饮',done:false},
+  {n:'红旗连锁',a:'高新区科华路56号',cat:'retail',catCN:'零售',done:true},
+  {n:'大蓉和酒楼',a:'高新区天府二街78号',cat:'restaurant',catCN:'餐饮',done:true},
+  {n:'巴蜀风川菜',a:'锦江区红星路三段12号',cat:'restaurant',catCN:'餐饮',done:false},
+  {n:'永辉超市',a:'锦江区东大街99号',cat:'retail',catCN:'零售',done:true},
+  {n:'龙抄手小吃',a:'青羊区宽窄巷子2号',cat:'restaurant',catCN:'餐饮',done:false},
+  {n:'海底捞火锅',a:'锦江区春熙路88号',cat:'restaurant',catCN:'餐饮',done:false},
+  {n:'星巴克咖啡',a:'高新区天府四街55号',cat:'restaurant',catCN:'餐饮',done:false},
+  {n:'麦当劳',a:'青羊区光华大道201号',cat:'restaurant',catCN:'餐饮',done:true},
+  {n:'全季酒店',a:'高新区天府大道800号',cat:'hotel',catCN:'酒店',done:true},
+  {n:'万达影城',a:'锦江区东大街200号',cat:'entertain',catCN:'娱乐',done:false},
+];
+
+const detailData = [
+  {n:'川西坝子火锅',cat:'餐饮',a:'四川省成都市高新区天府三街288号',tel:'028-85111234',hrs:'11:00-23:00',pos:'104.064,30.546',done:false},
+  {n:'蜀九香火锅',cat:'餐饮',a:'四川省成都市高新区天府大道1199号银泰城3F',tel:'028-85319876',hrs:'10:30-22:30',pos:'104.068,30.550',done:false},
+  {n:'红旗连锁',cat:'零售',a:'四川省成都市高新区科华路56号',tel:'028-85110011',hrs:'07:00-23:00',pos:'104.058,30.542',done:true},
+  {n:'大蓉和酒楼',cat:'餐饮',a:'四川省成都市高新区天府二街78号',tel:'028-85124488',hrs:'11:00-21:30',pos:'104.062,30.548',done:true},
+  {n:'永辉超市',cat:'零售',a:'四川省成都市锦江区东大街99号',tel:'028-86712233',hrs:'08:00-22:00',pos:'104.082,30.560',done:true},
+];
+
+function renderMobCards(data) {
+  document.getElementById('mobPoiCards').innerHTML = data.map(p => `
+    <div class="poi-card" onclick="openDetailPush(${mobPois.indexOf(p)})">
+      <div class="n">${p.n}</div>
+      <div class="a">${p.a}</div>
+      <div class="tags">
+        <span class="tag c">${p.catCN}</span>
+        <span class="tag ${p.done?'d':'n'}">${p.done?'已拉取':'待拉取'}</span>
+      </div>
+    </div>`).join('');
+}
+renderMobCards(mobPois);
+
+function filterMobCards() {
+  const q = (document.getElementById('mobSearch').value || '').toLowerCase();
+  const activeCat = document.querySelector('.filter-row .pill.on');
+  const cat = activeCat ? activeCat.dataset.cat : 'all';
+  renderMobCards(mobPois.filter(p => {
+    const mq = !q || p.n.toLowerCase().includes(q) || p.a.includes(q);
+    const mc = cat === 'all' || p.cat === cat;
+    return mq && mc;
+  }));
+}
+
+/* ── Detail push screen ── */
+function openDetailPush(idx) {
+  const d = detailData[idx % detailData.length];
+  document.getElementById('detailPushTitle').textContent = d.n;
+  document.getElementById('detailPushBody').innerHTML = `
+    <div class="detail-info-card">
+      <div class="cat-badge">${d.cat}</div>
+      <h2>${d.n}</h2>
+      <div class="info-row"><span class="k">地址</span><span class="v">${d.a}</span></div>
+      <div class="info-row"><span class="k">电话</span><span class="v">${d.tel}</span></div>
+      <div class="info-row"><span class="k">营业时间</span><span class="v">${d.hrs}</span></div>
+      <div class="info-row"><span class="k">坐标</span><span class="v">${d.pos}</span></div>
+      <div class="info-row"><span class="k">高德 POI ID</span><span class="v">B0FF${String(idx+1).padStart(4,'0')}</span></div>
+      <div class="info-row"><span class="k">状态</span><span class="v" style="color:${d.done?'var(--success)':'var(--accent)'}">${d.done?'已拉取':'待拉取'}</span></div>
+    </div>
+    <div class="detail-actions">
+      <button class="primary" onclick="alert('📞 拨打 ${d.tel}')">📞 拨打电话</button>
+      <button>📍 地图查看</button>
+    </div>
+    <div class="detail-actions" style="margin-top:8px">
+      <button onclick="if(confirm('确认导出?数据可用于配送调度'))alert('✅ 已导出到 Excel')">📥 导出</button>
+      <button style="color:var(--warn)" onclick="alert('⚠ 已标记为重复检查')">⚠ 标记重复</button>
+    </div>`;
+  document.getElementById('detailPush').classList.add('show');
+}
+function closeDetailPush() {
+  document.getElementById('detailPush').classList.remove('show');
+}
+
+/* ── Locate map ── */
+function locateMap() {
+  if (!navigator.geolocation) {
+    alert('当前浏览器不支持定位');
+    return;
+  }
+  // Flash the locate button to indicate positioning
+  const el = event.target.closest('.fab');
+  if (el) { el.style.background = 'var(--accent)'; el.style.color = '#fff'; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      if (el) { el.style.background = ''; el.style.color = ''; }
+      alert(`📍 当前位置：${longitude.toFixed(4)}°E, ${latitude.toFixed(4)}°N\n（模拟：已定位到高新区南）`);
+    },
+    err => {
+      if (el) { el.style.background = ''; el.style.color = ''; }
+      // Fallback: simulate a location
+      alert('📍 模拟定位：104.0645°E, 30.5462°N\n（已定位到高新区南）');
+    },
+    { timeout: 5000, enableHighAccuracy: true }
+  );
+}
+
+/* ── Check update ── */
+function checkUpdate() {
+  const btn = event.target;
+  btn.textContent = '⏳ 检查中…';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = '🔄 检查更新';
+    btn.disabled = false;
+    document.getElementById('updateStatus').innerHTML = '<span style="color:var(--accent);cursor:pointer" onclick="doUpdate()">发现 v2.2.1 → 点击更新</span>';
+    document.getElementById('lastCheck').textContent = '上次检查：刚刚';
+  }, 1200);
+}
+function doUpdate() {
+  if (confirm('更新到 v2.2.1？更新内容：优化 API 请求队列、修复坐标精度问题')) {
+    document.getElementById('updateStatus').innerHTML = '<span style="color:var(--success)">✓ 已更新至 v2.2.1</span>';
+    document.querySelector('.vnow').textContent = 'v2.2.1';
+  }
+}
+</script>
+</body>
+</html>

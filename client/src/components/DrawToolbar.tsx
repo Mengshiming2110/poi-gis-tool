@@ -21,16 +21,16 @@ function DrawToolbar({ activeMode, onModeChange, onClear, setDrawMode }: DrawToo
 
   const btnStyle = (mode: DrawMode): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, height: 32, border: 'none', borderRadius: 6,
-    background: activeMode === mode ? '#3b82f6' : 'transparent',
-    color: activeMode === mode ? '#fff' : '#475569', cursor: 'pointer',
+    width: 32, height: 32, border: '1px solid var(--border)', borderRadius: 5,
+    background: activeMode === mode ? 'var(--accent)' : 'var(--surface)',
+    color: activeMode === mode ? '#fff' : 'var(--muted)', cursor: 'pointer',
   });
 
   return (
     <div style={{
       position: 'absolute', top: 12, right: 12, zIndex: 10,
-      display: 'flex', gap: 4, background: 'rgba(255,255,255,0.95)',
-      borderRadius: 8, padding: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      display: 'flex', gap: 3, background: 'var(--surface)',
+      borderRadius: 'var(--radius)', padding: 3, border: '1px solid var(--border)',
     }}>
       <button type="button" style={btnStyle('polygon')} onClick={() => activateMode('polygon')} title="多边形">
         <Polygon size={18} />

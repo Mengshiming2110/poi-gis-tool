@@ -1,186 +1,116 @@
-import React, { useEffect, useState } from 'react';
-import StepCategories from './StepCategories';
-import StepDraw from './StepDraw';
-import StepGrid from './StepGrid';
-import StepCollect from './StepCollect';
-import StepResults from './StepResults';
-import MobileSettings from './MobileSettings';
+import React, { useState, useEffect } from 'react';
+import MobileMapTab from './MobileMapTab';
+import MobileDataTab from './MobileDataTab';
+import MobileProgressTab from './MobileProgressTab';
+import MobileSettingsTab from './MobileSettingsTab';
 import UpdatePrompt from '../UpdatePrompt';
 import { useAmap, type DrawnShape } from '../../hooks/useAmap';
 import { checkForUpdate, type UpdateInfo } from '../../services/updater';
-import { CATEGORY_LIST } from '../../types/poi';
 
-const PANEL_COPY = [
-  { title: '想采集什么？', hint: '选择目标类型，少选类别能节省 API 调用。' },
-  { title: '圈一个范围', hint: '选择绘制方式后，直接在地图上操作。' },
-  { title: '设置采集精度', hint: '先用省额度或均衡，确认范围后再细化。' },
-  { title: '正在获取 POI', hint: '缓存会自动复用，触发限额会立即停止。' },
-  { title: '数据已准备好', hint: '同步到桌面端，或分享导出文件。' },
-];
+const TABS = [
+  { id: 'map', label: '地图' },
+  { id: 'data', label: '数据' },
+  { id: 'progress', label: '进度' },
+  { id: 'settings', label: '设置' },
+] as const;
+
+type TabId = typeof TABS[number]['id'];
 
 function MobileApp() {
-  const [step, setStep] = useState(1);
+  const [tab, setTab] = useState<TabId>('map');
   const [categories, setCategories] = useState<string[]>([]);
   const [drawnShape, setDrawnShape] = useState<DrawnShape | null>(null);
   const [poiData, setPoiData] = useState<any[]>([]);
   const [locating, setLocating] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [collectStatus, setCollectStatus] = useState<'idle' | 'running' | 'done'>('idle');
+  const [collectProgress, setCollectProgress] = useState({ done: 0, total: 0, pois: 0 });
+
+  const amap = useAmap('mobile-map');
 
   useEffect(() => {
     checkForUpdate().then((info) => { if (info.available) setUpdateInfo(info); });
   }, []);
 
-  // Single shared map instance for steps 2-3
-  const amap = useAmap('mobile-map');
-
   useEffect(() => {
-    if ((step === 2 || step === 3) && amap.map) {
-      setTimeout(() => {
-        try { amap.map.resize(); } catch (e) {}
-      }, 100);
+    if ((tab === 'map') && amap.map) {
+      setTimeout(() => { try { amap.map.resize(); } catch (e) {} }, 100);
     }
-  }, [step, amap.map]);
+  }, [tab, amap.map]);
 
   const handleLocate = async () => {
     setLocating(true);
-    const ok = await amap.locateMe();
+    await amap.locateMe();
     setLocating(false);
-    if (!ok) {
-      // Could show a toast here
-    }
   };
 
-  const canNext = () => {
-    if (step === 1) return categories.length > 0;
-    if (step === 2) return !!drawnShape;
-    if (step === 3) return amap.gridCells.length > 0;
-    return true;
-  };
-
-  const next = () => { if (canNext() && step < 5) setStep((s) => s + 1); };
-  const prev = () => { if (step > 1) setStep((s) => s - 1); };
-
-  const selectedNames = CATEGORY_LIST
-    .filter((c) => categories.includes(c.code))
-    .map((c) => c.name);
-
-  const primaryLabel = () => {
-    if (step === 1) return categories.length > 0 ? '去圈定区域' : '先选择类别';
-    if (step === 2) return drawnShape ? '确认区域' : '先画区域';
-    if (step === 3) return amap.gridCells.length > 0 ? '开始获取 POI' : '先生成网格';
-    return '下一步';
-  };
-
-  const restart = () => {
-    setStep(1); setPoiData([]); setCategories([]);
-    setDrawnShape(null);
-    amap.clearDrawings();
+  const handleCollectComplete = (pois: any[]) => {
+    setPoiData(pois);
+    setCollectStatus('done');
   };
 
   return (
     <div className="mobile-app">
-      <div className="mobile-body">
-        <div id="mobile-map" style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-        }} />
+      {/* Status bar */}
+      <div className="mobile-statusbar">
+        <span className="t">
+          {tab === 'map' ? '地图工作台' : tab === 'data' ? '数据浏览' : tab === 'progress' ? '拉取进度' : '系统设置'}
+        </span>
+        <span className="badge badge-accent">v1.0.0</span>
+      </div>
 
-        {(step === 2 || step === 3) && (
-          <button
-            onClick={handleLocate}
-            disabled={locating}
-            title="定位到当前位置"
-            className="mobile-locate-btn"
-          >
-            {locating ? '⟳' : '⌖'}
-          </button>
-        )}
+      {/* Screens */}
+      <div className="mobile-screens">
+        <div className={`mobile-screen ${tab === 'map' ? 'active' : ''}`}>
+          <MobileMapTab
+            amap={amap}
+            categories={categories}
+            onCategoriesChange={setCategories}
+            drawnShape={drawnShape}
+            onShapeChange={setDrawnShape}
+            locating={locating}
+            onLocate={handleLocate}
+            onCollectStart={() => { setCollectStatus('running'); setCollectProgress({ done: 0, total: 0, pois: 0 }); }}
+            onCollectProgress={(d, t, p) => setCollectProgress({ done: d, total: t, pois: p })}
+            onCollectComplete={handleCollectComplete}
+          />
+        </div>
 
-        <div className={`mobile-sheet ${step >= 4 ? 'mobile-sheet-tall' : ''}`}>
-          <div className="mobile-sheet-handle" />
-          <div className="mobile-sheet-head">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ flex: 1 }}>
-                <div className="mobile-sheet-title">{PANEL_COPY[step - 1].title}</div>
-                <div className="mobile-sheet-subtitle">{PANEL_COPY[step - 1].hint}</div>
-              </div>
-              {step > 1 && selectedNames.length > 0 && (
-                <div className="mobile-mini-summary">
-                  {selectedNames.slice(0, 2).join('、')}{selectedNames.length > 2 ? `等 ${selectedNames.length} 类` : ''}
-                </div>
-              )}
-              <button
-                onClick={() => setSettingsOpen(true)}
-                style={{
-                  border: 'none', background: '#f1f5f9', borderRadius: '50%',
-                  width: 36, height: 36, fontSize: 18, cursor: 'pointer', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >⚙</button>
-            </div>
-          </div>
+        <div className={`mobile-screen ${tab === 'data' ? 'active' : ''}`}>
+          <MobileDataTab pois={poiData} />
+        </div>
 
-          <div className="mobile-sheet-content">
-            {step === 1 && <StepCategories selected={categories} onChange={setCategories} />}
+        <div className={`mobile-screen ${tab === 'progress' ? 'active' : ''}`}>
+          <MobileProgressTab status={collectStatus} progress={collectProgress} />
+        </div>
 
-            {step === 2 && (
-              <StepDraw
-                loaded={amap.loaded}
-                drawnShape={drawnShape}
-                setDrawMode={amap.setDrawMode}
-                clearDrawings={amap.clearDrawings}
-                getDrawnShape={amap.getDrawnShape}
-                onShapeChange={setDrawnShape}
-              />
-            )}
-
-            {step === 3 && (
-              <StepGrid
-                loaded={amap.loaded}
-                drawnShape={drawnShape}
-                gridCells={amap.gridCells}
-                splitGrid={amap.splitGrid}
-              />
-            )}
-
-            {step === 4 && (
-              <StepCollect
-                categories={categories}
-                gridCells={amap.gridCells}
-                collectPOIsClientSide={amap.collectPOIsClientSide}
-                stopCollecting={amap.stopCollecting}
-                onComplete={(pois: any[]) => { setPoiData(pois); setStep(5); }}
-              />
-            )}
-
-            {step === 5 && <StepResults pois={poiData} categories={categories} onRestart={restart} />}
-          </div>
-
-          {step < 4 && (
-            <div className="mobile-action-row">
-              {step > 1 && (
-                <button className="mobile-btn mobile-btn-secondary" onClick={prev}>返回</button>
-              )}
-              <button className="mobile-btn mobile-btn-primary" disabled={!canNext()} onClick={next}>
-                {primaryLabel()}
-              </button>
-            </div>
-          )}
+        <div className={`mobile-screen ${tab === 'settings' ? 'active' : ''}`}>
+          <MobileSettingsTab />
         </div>
       </div>
 
-      <MobileSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {/* Bottom Tab Bar */}
+      <nav className="mobile-tab-bar">
+        <button className={`mobile-tab ${tab === 'map' ? 'active' : ''}`} onClick={() => setTab('map')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+          <span>地图</span>
+        </button>
+        <button className={`mobile-tab ${tab === 'data' ? 'active' : ''}`} onClick={() => setTab('data')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v5c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 11v5c0 1.66 3.58 3 8 3s8-1.34 8-3v-5"/></svg>
+          <span>数据</span>
+        </button>
+        <button className={`mobile-tab ${tab === 'progress' ? 'active' : ''}`} onClick={() => setTab('progress')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          <span>进度</span>
+        </button>
+        <button className={`mobile-tab ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4"/></svg>
+          <span>设置</span>
+        </button>
+      </nav>
 
       {updateInfo && (
-        <UpdatePrompt
-          version={updateInfo.version}
-          url={updateInfo.url}
-          body={updateInfo.body}
-          onDismiss={() => setUpdateInfo(null)}
-        />
+        <UpdatePrompt version={updateInfo.version} url={updateInfo.url} body={updateInfo.body} onDismiss={() => setUpdateInfo(null)} />
       )}
     </div>
   );
