@@ -207,8 +207,9 @@ function DesktopApp() {
     const bounds = drawAPIRef.current?.getBounds() || { southwest: { lng: 116.3, lat: 39.8 }, northeast: { lng: 116.5, lat: 40.0 } };
     const amapKey = (localStorage.getItem('amap_rest_key') || '').trim();
     const skipDuplicates = localStorage.getItem('amap_skip_dup') !== 'false';
-    if (!amapKey) { showToast('请先在系统设置中配置高德 Web 服务 Key', 'error'); return; }
-    collection.start({ mode: 'region', categories: selectedCategories, bounds, gridSize: gridSizeMeters / 111320, skipDuplicates, amapKey });
+    const debugMode = localStorage.getItem('amap_debug_mode') === 'true';
+    if (!amapKey && !debugMode) { showToast('请先在系统设置中配置高德 Web 服务 Key，或开启调试模式', 'error'); return; }
+    collection.start({ mode: 'region', categories: selectedCategories, bounds, gridSize: gridSizeMeters / 111320, skipDuplicates, amapKey: amapKey || 'debug', debug: debugMode });
     setView('progress');
     showToast('开始采集', 'info');
   }, [selectedCategories, gridSizeMeters, collection, showToast]);
@@ -681,6 +682,11 @@ function DesktopApp() {
           <span>采集完成后自动上传</span>
           <div className={`desktop-toggle ${localStorage.getItem('amap_auto_upload') === 'true' ? 'on' : ''}`}
             onClick={e => { const t = e.currentTarget; t.classList.toggle('on'); localStorage.setItem('amap_auto_upload', t.classList.contains('on') ? 'true' : 'false'); }} />
+        </div>
+        <div className="desktop-set-row">
+          <span>🔧 调试模式（模拟POI数据）</span>
+          <div className={`desktop-toggle ${localStorage.getItem('amap_debug_mode') === 'true' ? 'on' : ''}`}
+            onClick={e => { const t = e.currentTarget; t.classList.toggle('on'); localStorage.setItem('amap_debug_mode', t.classList.contains('on') ? 'true' : 'false'); }} />
         </div>
       </div>
       <div className="card">

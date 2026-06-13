@@ -4,6 +4,7 @@ import { generateGrid, filterCellsByPolygon, estimateTime } from './services/gri
 import { createTask, updateTaskStatus, incrementTaskProgress, insertPois, getTask, failTask } from './db';
 import { cloudInsertTask, cloudUpdateTask, cloudInsertPois } from './services/cloud';
 import { config } from './config';
+import { mockAmapResponse } from './services/mock-pois';
 import type { CollectRequest, GridCell, AmapPoiItem, TaskStatus } from './types';
 
 interface ActiveTask {
@@ -14,6 +15,7 @@ interface ActiveTask {
   categories: string[];
   amapKey?: string;
   skipDuplicates: boolean;
+  debug: boolean;
   onProgress: (data: any) => void;
   onComplete: (data: any) => void;
   onError: (data: any) => void;
@@ -87,6 +89,7 @@ export function startCollection(
     categories: req.categories,
     amapKey: req.amapKey?.trim() || undefined,
     skipDuplicates: req.skipDuplicates || false,
+    debug: req.debug || false,
     onProgress,
     onComplete,
     onError,
@@ -118,10 +121,21 @@ async function processNextCell(taskId: string): Promise<void> {
   }
 
   const cell = task.cells[task.currentIndex];
-  console.log(`[Queue] 处理格子 ${task.currentIndex + 1}/${task.cells.length} [${cell.row},${cell.col}]`);
+  console.log(`[Queue] 处理格子 ${task.currentIndex + 1}/${task.cells.length} [${cell.row},${cell.col}]${task.debug ? ' [调试模式]' : ''}`);
   let pois: AmapPoiItem[] = [];
   try {
+  if (task.debug) {
+    // Mock mode: generate fake POIs, simulate delay
+    await sleep(300);
+    for (const catCode of task.categories) {
+      const centerLng = (cell.sw.lng + cell.ne.lng) / 2;
+      const centerLat = (cell.sw.lat + cell.ne.lat) / 2;
+      const mock = mockAmapResponse(centerLng, centerLat, catCode);
+      pois.push(...(mock.pois as any));
+    }
+  } else {
     pois = await collectCellWithRetry(cell, task.categories, task.amapKey);
+  }
   } catch (err: any) {
     const message = err instanceof AmapApiError ? err.message : (err?.message || '采集任务失败');
     console.error(`[Queue] 采集失败: taskId=${taskId} ${message}`);

@@ -14,6 +14,7 @@ export interface CollectRequest {
   region?: GeoJSON.Polygon;
   amapKey?: string;
   skipDuplicates?: boolean;
+  debug?: boolean;
 }
 
 export interface CollectResponse {
