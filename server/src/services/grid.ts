@@ -20,8 +20,28 @@ export function generateGrid(bounds: Bounds, gridSize: number): GridCell[] {
   return cells;
 }
 
-export function filterCellsByPolygon(cells: GridCell[], _polygon: any): GridCell[] {
-  return cells;
+export function filterCellsByPolygon(cells: GridCell[], polygon: any): GridCell[] {
+  const ring: [number, number][] = polygon?.coordinates?.[0];
+  if (!ring || ring.length < 3) return cells;
+
+  return cells.filter(cell => {
+    const cx = (cell.sw.lng + cell.ne.lng) / 2;
+    const cy = (cell.sw.lat + cell.ne.lat) / 2;
+    return pointInPolygon([cx, cy], ring);
+  });
+}
+
+function pointInPolygon(point: [number, number], ring: [number, number][]): boolean {
+  const [px, py] = point;
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
 }
 
 export function estimateTime(cellCount: number): number {

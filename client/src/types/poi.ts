@@ -13,6 +13,7 @@ export interface CollectRequest {
   gridSize?: number;
   region?: GeoJSON.Polygon;
   amapKey?: string;
+  skipDuplicates?: boolean;
 }
 
 export interface CollectResponse {

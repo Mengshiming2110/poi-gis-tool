@@ -14,7 +14,7 @@ import StepResults from './StepResults';
 import MobileSettings from './MobileSettings';
 import UpdatePrompt from '../UpdatePrompt';
 import { useAmap, type DrawnShape } from '../../hooks/useAmap';
-import { checkForUpdate, type UpdateInfo } from '../../services/updater';
+import { checkForUpdate, CURRENT_VERSION, RELEASES_URL, type UpdateInfo } from '../../services/updater';
 import { CATEGORY_LIST } from '../../types/poi';
 
 type MobileTab = 'map' | 'data' | 'progress' | 'settings';
@@ -47,7 +47,10 @@ function MobileApp() {
   const amap = useAmap('mobile-map');
 
   useEffect(() => {
-    checkForUpdate().then((info) => { if (info.available) setUpdateInfo(info); });
+    checkForUpdate().then((info) => {
+      if (info.available) setUpdateInfo(info);
+      else if (info.error) setUpdateInfo({ ...info }); // store for UI display
+    });
   }, []);
 
   useEffect(() => {
@@ -97,7 +100,7 @@ function MobileApp() {
     <div className="mobile-app">
       <div className="mobile-statusbar product-titlebar">
         <span className="t">{MOBILE_TITLES[tab]}</span>
-        <span className="badge badge-accent">v2.2.0</span>
+        <span className="badge badge-accent">v{CURRENT_VERSION}</span>
       </div>
 
       <div className="mobile-screens">
@@ -245,38 +248,48 @@ function MobileApp() {
               <h4>高德开放平台 API</h4>
               <label className="set-field">
                 <span>API KEY (WEB服务)</span>
-                <input type="password" value="••••••••••••••••••••••••" readOnly />
+                <input type="password" value={(localStorage.getItem('amap_rest_key') || '').slice(0, 8) + '••••••••••••'} readOnly />
               </label>
               <label className="set-field">
                 <span>API KEY (JS API)</span>
                 <input value={localStorage.getItem('amap_js_key') || ''} placeholder="输入高德 JS API Key" readOnly />
               </label>
-              <div className="setting-row"><span>使用代理转发</span><b className="switch on" /></div>
               <button className="mobile-btn primary" onClick={() => setSettingsOpen(true)}>打开 API 设置</button>
             </div>
             <div className="set-card">
               <h4>采集参数</h4>
-              <div className="setting-row"><span>POI 类型范围</span><b>全部类型</b></div>
               <div className="setting-row"><span>搜索半径</span><b>{Number(localStorage.getItem('amap_search_radius') || '1000').toLocaleString()}m</b></div>
-              <div className="setting-row"><span>单次请求上限</span><b>25 条</b></div>
-              <div className="setting-row"><span>请求间隔</span><b>500ms</b></div>
-              <div className="setting-row"><span>自动跳过重复</span><b className="switch on" /></div>
-              <div className="setting-row"><span>拉取完自动上传</span><b className="switch" /></div>
+              <div className="setting-row"><span>单次请求上限</span><b>{localStorage.getItem('amap_page_size') || '25'} 条</b></div>
+              <div className="setting-row"><span>请求间隔</span><b>{localStorage.getItem('amap_request_delay') || '500'}ms</b></div>
+              <div className="setting-row"><span>请求最大页数</span><b>{localStorage.getItem('amap_max_pages_per_query') || '2'} 页</b></div>
+              <div className="setting-row"><span>密集切分阈值</span><b>{localStorage.getItem('amap_dense_split_threshold') || '80'} 条</b></div>
             </div>
             <div className="set-card">
               <h4>版本管理</h4>
               <div className="update-row">
-                <span className="vnow">v2.2.0</span>
-                <span className="ustat">{updateInfo ? `发现 ${updateInfo.version}` : '已是最新'}</span>
+                <span className="vnow">v{CURRENT_VERSION}</span>
+                <span className="ustat" style={{ color: updateInfo?.error ? 'var(--warn)' : updateInfo?.available ? 'var(--accent)' : undefined }}>
+                  {updateInfo?.error ? '⚠ 检查失败' : updateInfo?.available ? `发现 ${updateInfo.version}` : '已是最新'}
+                </span>
               </div>
               <button
                 className="mobile-btn"
-                onClick={() => checkForUpdate().then((info) => { if (info.available) setUpdateInfo(info); })}
+                onClick={() => checkForUpdate().then((info) => {
+                  if (info.available) setUpdateInfo(info);
+                  else if (info.error) setUpdateInfo({ ...info });
+                  else setUpdateInfo(null);
+                })}
               >
                 检查更新
               </button>
+              {updateInfo?.error && (
+                <a href={RELEASES_URL} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'block', marginTop: 8, textAlign: 'center', fontSize: 12, color: 'var(--accent)' }}>
+                  访问 GitHub Releases →
+                </a>
+              )}
               <div className="version-list">
-                <div><b>v2.2.0</b><span>新增检查更新功能</span><em>06-13</em></div>
+                <div><b>v{CURRENT_VERSION}</b><span>新增检查更新 + 底部Tab导航</span><em>06-13</em></div>
                 <div><b>v2.1.0</b><span>按区域分组存储、重复检测优化</span><em>06-10</em></div>
                 <div><b>v2.0.3</b><span>修复坐标偏移、暗色适配</span><em>05-28</em></div>
                 <div><b>v2.0.0</b><span>重构采集引擎、Excel 导出</span><em>05-15</em></div>
@@ -302,6 +315,7 @@ function MobileApp() {
           version={updateInfo.version}
           url={updateInfo.url}
           body={updateInfo.body}
+          downloadUrl={updateInfo.downloadUrl}
           onDismiss={() => setUpdateInfo(null)}
         />
       )}

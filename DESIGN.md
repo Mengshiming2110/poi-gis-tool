@@ -273,17 +273,33 @@ POI GIS 采集工具
 
 ```
 project/
-├── index.html      ← 桌面版（单文件，内联 CSS + JS）
-├── mobile.html     ← 手机版（单文件，内联 CSS + JS）
-└── DESIGN.md       ← 本文档
+├── client/             ← React 18 + TypeScript + Vite 前端
+│   ├── src/
+│   │   ├── components/    ← DesktopApp / MobileApp + 子组件
+│   │   ├── hooks/         ← useAmap / useCollection / useSSE
+│   │   ├── services/      ← api.ts / supabase.ts / updater.ts
+│   │   └── types/         ← 共享类型定义
+│   └── android/           ← Capacitor Android 工程
+├── server/             ← Express + sql.js 采集后端
+│   └── src/
+│       ├── routes/        ← collection / pois / export
+│       └── services/      ← amap / grid / cloud
+├── electron/           ← Electron 桌面壳
+├── index.html          ← 桌面端 HTML 原型
+├── mobile.html         ← 移动端 HTML 原型
+└── DESIGN.md           ← 本文档
 ```
 
 ### 7.2 技术选型
 
-- **纯 HTML / CSS / 原生 JS**：无框架依赖，零构建步骤
-- **CSS 自定义属性**：全局 tokens → `:root`，暗色模式→ `.dark` 覆盖
-- **Flexbox + CSS Grid**：响应式布局
-- **视图切换**：基于 `data-view` 属性 + class toggle（无路由库）
+- **React 18 + TypeScript + Vite**：组件化 UI，类型安全
+- **高德 JS API v2.0**：地图显示、MouseTool 圈选（CDN 加载）
+- **高德 REST API v3**：POI 搜索采集（`restapi.amap.com/v3/place/around`）
+- **Express + sql.js (WASM SQLite)**：服务端采集调度与数据存储
+- **Electron + electron-builder**：桌面端 `.exe` 打包
+- **Capacitor**：Android `.apk` 打包
+- **Supabase**：云端数据同步
+- **CSS 自定义属性 (oklch)**：全局 tokens + 暗色模式
 
 ### 7.3 模拟数据
 

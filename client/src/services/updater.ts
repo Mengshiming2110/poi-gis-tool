@@ -1,6 +1,6 @@
 const REPO_OWNER = 'Mengshiming2110';
 const REPO_NAME = 'poi-gis-tool';
-const CURRENT_VERSION = '1.0.0';
+export const CURRENT_VERSION = '2.2.0';
 
 interface Release {
   tag: string;
@@ -52,29 +52,33 @@ function isNewer(latest: string, current: string): boolean {
   return false;
 }
 
+export const RELEASES_URL = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases`;
+
 export interface UpdateInfo {
   available: boolean;
   version: string;
   url: string;
   body: string;
+  error?: boolean;      // true = network error, couldn't check
+  downloadUrl?: string; // direct .exe download URL from release assets
 }
 
 export async function checkForUpdate(): Promise<UpdateInfo> {
   const latest = await fetchLatestRelease();
   if (!latest || !latest.tag) {
-    return { available: false, version: '', url: '', body: '' };
+    return { available: false, version: '', url: RELEASES_URL, body: '', error: true };
   }
 
   if (isNewer(latest.tag, CURRENT_VERSION)) {
+    const exeAsset = latest.assets.find(a => a.name.endsWith('.exe'));
     return {
       available: true,
       version: latest.tag,
       url: latest.url,
       body: latest.body,
+      downloadUrl: exeAsset?.url || '',
     };
   }
 
   return { available: false, version: '', url: '', body: '' };
 }
-
-export { CURRENT_VERSION };

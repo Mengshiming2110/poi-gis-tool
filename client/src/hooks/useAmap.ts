@@ -51,18 +51,23 @@ export function useAmap(containerId: string) {
   const [isCollecting, setIsCollecting] = useState(false);
   const collectingRef = useRef(false);
 
-  // Custom two-tap drawing state (replaces MouseTool for rect/circle on touch devices)
-  const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0);
+  // Custom two-click drawing state (rect/circle) with live preview
   const customDrawRef = useRef<{
     phase: 'idle' | 'first-point';
     firstPoint: [number, number] | null;
     anchorMarker: any;
+    previewOverlay: any;
     clickHandler: ((e: any) => void) | null;
+    mouseMoveHandler: ((e: any) => void) | null;
+    keyDownHandler: ((e: KeyboardEvent) => void) | null;
   }>({
     phase: 'idle',
     firstPoint: null,
     anchorMarker: null,
+    previewOverlay: null,
     clickHandler: null,
+    mouseMoveHandler: null,
+    keyDownHandler: null,
   });
 
   const cleanupCustomDraw = useCallback(() => {
@@ -71,13 +76,28 @@ export function useAmap(containerId: string) {
     if (cd.anchorMarker && inst) {
       try { inst.remove(cd.anchorMarker); } catch (e) {}
     }
+    if (cd.previewOverlay && inst) {
+      try { inst.remove(cd.previewOverlay); } catch (e) {}
+    }
     if (cd.clickHandler && inst) {
       inst.off('click', cd.clickHandler);
     }
+    if (cd.mouseMoveHandler && inst) {
+      inst.off('mousemove', cd.mouseMoveHandler);
+    }
+    if (cd.keyDownHandler) {
+      document.removeEventListener('keydown', cd.keyDownHandler);
+    }
+    // Reset cursor
+    const mapEl = inst?.getContainer?.();
+    if (mapEl) mapEl.style.cursor = '';
     cd.phase = 'idle';
     cd.firstPoint = null;
     cd.anchorMarker = null;
+    cd.previewOverlay = null;
     cd.clickHandler = null;
+    cd.mouseMoveHandler = null;
+    cd.keyDownHandler = null;
   }, []);
 
   // Poll until window.AMap is available, then init
@@ -136,9 +156,10 @@ export function useAmap(containerId: string) {
             setDrawnShape(shapeInfo);
             setGridCells([]);
           }
-          mouseTool.close(true);
+          mouseTool.close(false);
           // Re-enable map drag after drawing completes
           instance.setStatus({ dragEnable: true });
+          setDrawModeState(null); // auto-exit draw mode on desktop too
         });
 
         const placeSearch = new AMap.PlaceSearch({ pageSize: 25, pageIndex: 1 });
@@ -185,26 +206,28 @@ export function useAmap(containerId: string) {
     setDrawModeState(mode);
   }, []);
 
-  // Toggle map drag when draw mode changes (prevents conflict on mobile)
+  // Draw mode switching — polygon uses MouseTool, rect/circle use two-click + live preview
   useEffect(() => {
     const mt = mouseToolRef.current;
     const mapInstance = mapRef.current;
     if (!mapInstance) return;
 
-    // Clean up any custom two-tap draw in progress
+    // Clean up previous drawing session
     cleanupCustomDraw();
-    if (mt) mt.close(true);
+    if (mt) mt.close(false);
 
     if (!drawMode) {
       mapInstance.setStatus({ dragEnable: true });
       return;
     }
 
-    // Disable map dragging while in draw mode (critical for mobile)
+    // Disable map dragging while in draw mode
     mapInstance.setStatus({ dragEnable: false });
+    const mapEl = mapInstance.getContainer();
+    if (mapEl) mapEl.style.cursor = 'crosshair';
 
     if (drawMode === 'polygon') {
-      // Polygon: always use MouseTool (tap-to-add-points works on touch)
+      // Polygon: MouseTool click-to-add-vertices — no drag conflict
       if (!mt) return;
       mt.polygon({
         strokeColor: '#4A90D9', fillColor: '#4A90D9',
@@ -213,33 +236,53 @@ export function useAmap(containerId: string) {
       return;
     }
 
-    // Rectangle / Circle on touch devices → custom two-tap drawing
-    // On mouse devices → keep MouseTool drag-to-draw
-    if (!isTouchDevice) {
-      if (!mt) return;
-      if (drawMode === 'rectangle') {
-        mt.rectangle({
-          strokeColor: '#27AE60', fillColor: '#27AE60',
-          strokeWeight: 3, strokeOpacity: 0.8, fillOpacity: 0.15, strokeStyle: 'dashed',
-        });
-      } else {
-        mt.circle({
-          strokeColor: '#F39C12', fillColor: '#F39C12',
-          strokeWeight: 3, strokeOpacity: 0.8, fillOpacity: 0.15, strokeStyle: 'dashed',
-        });
-      }
-      return;
-    }
-
-    // --- Touch: two-tap custom drawing ---
+    // ─── Rectangle / Circle: two-click drawing with live preview ───
     const AMap = window.AMap;
     const cd = customDrawRef.current;
+    const color = drawMode === 'rectangle' ? '#27AE60' : '#F39C12';
 
+    // --- mousemove: update live preview ---
+    const onMouseMove = (e: any) => {
+      if (cd.phase !== 'first-point' || !cd.firstPoint) return;
+      const cursor: [number, number] = [e.lnglat.lng, e.lnglat.lat];
+      const first = cd.firstPoint;
+
+      // Remove old preview
+      if (cd.previewOverlay) {
+        try { mapInstance.remove(cd.previewOverlay); } catch (e) {}
+        cd.previewOverlay = null;
+      }
+
+      let overlay: any;
+      if (drawMode === 'rectangle') {
+        const sw: [number, number] = [Math.min(first[0], cursor[0]), Math.min(first[1], cursor[1])];
+        const ne: [number, number] = [Math.max(first[0], cursor[0]), Math.max(first[1], cursor[1])];
+        overlay = new AMap.Rectangle({
+          bounds: new AMap.Bounds(new AMap.LngLat(sw[0], sw[1]), new AMap.LngLat(ne[0], ne[1])),
+          strokeColor: color, fillColor: color,
+          strokeWeight: 2, strokeOpacity: 0.45, fillOpacity: 0.06, strokeStyle: 'dashed',
+        });
+      } else {
+        const latDiff = (cursor[1] - first[1]) * 111320;
+        const lngDiff = (cursor[0] - first[0]) * 111320 * Math.cos((first[1] * Math.PI) / 180);
+        const radius = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+        overlay = new AMap.Circle({
+          center: new AMap.LngLat(first[0], first[1]),
+          radius,
+          strokeColor: color, fillColor: color,
+          strokeWeight: 2, strokeOpacity: 0.45, fillOpacity: 0.06, strokeStyle: 'dashed',
+        });
+      }
+      overlay.setMap(mapInstance);
+      cd.previewOverlay = overlay;
+    };
+
+    // --- click: two-click state machine ---
     const onClick = (e: any) => {
       const point: [number, number] = [e.lnglat.lng, e.lnglat.lat];
 
       if (cd.phase === 'idle') {
-        // Tap 1: place anchor marker
+        // Click 1: place anchor marker + start preview
         cd.phase = 'first-point';
         cd.firstPoint = point;
         const marker = new AMap.Marker({
@@ -247,7 +290,7 @@ export function useAmap(containerId: string) {
           anchor: 'center',
           content: `<div style="
             width:16px;height:16px;
-            background:${drawMode === 'rectangle' ? '#27AE60' : '#F39C12'};
+            background:${color};
             border:3px solid #fff;border-radius:50%;
             box-shadow:0 2px 6px rgba(0,0,0,0.5);
             animation:pulse 0.8s infinite;
@@ -255,10 +298,14 @@ export function useAmap(containerId: string) {
         });
         marker.setMap(mapInstance);
         cd.anchorMarker = marker;
+
+        // Start live preview
+        cd.mouseMoveHandler = onMouseMove;
+        mapInstance.on('mousemove', onMouseMove);
         return;
       }
 
-      // Tap 2: create shape from anchor → tap point
+      // ─── Click 2: finalize shape ───
       const first = cd.firstPoint!;
       let shapeInfo: DrawnShape | null = null;
 
@@ -268,27 +315,26 @@ export function useAmap(containerId: string) {
         const rectPath: [number, number][] = [sw, [ne[0], sw[1]], ne, [sw[0], ne[1]]];
         const rect = new AMap.Rectangle({
           bounds: new AMap.Bounds(new AMap.LngLat(sw[0], sw[1]), new AMap.LngLat(ne[0], ne[1])),
-          strokeColor: '#27AE60', fillColor: '#27AE60',
+          strokeColor: color, fillColor: color,
           strokeWeight: 3, strokeOpacity: 0.8, fillOpacity: 0.15, strokeStyle: 'dashed',
         });
         rect.setMap(mapInstance);
         shapeInfo = { type: 'rectangle', geometry: { path: rectPath, bounds: [sw, ne] }, overlay: rect };
       } else {
-        // circle: anchor = center, tap = edge point → radius
         const latDiff = (point[1] - first[1]) * 111320;
         const lngDiff = (point[0] - first[0]) * 111320 * Math.cos((first[1] * Math.PI) / 180);
         const radius = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
         const circle = new AMap.Circle({
           center: new AMap.LngLat(first[0], first[1]),
           radius,
-          strokeColor: '#F39C12', fillColor: '#F39C12',
+          strokeColor: color, fillColor: color,
           strokeWeight: 3, strokeOpacity: 0.8, fillOpacity: 0.15, strokeStyle: 'dashed',
         });
         circle.setMap(mapInstance);
         shapeInfo = { type: 'circle', geometry: { center: first, radius }, overlay: circle };
       }
 
-      // Clean up old shape
+      // Clean old shape + grids
       if (drawnShapeRef.current?.overlay) {
         try { mapInstance.remove(drawnShapeRef.current.overlay); } catch (e) {}
       }
@@ -298,14 +344,27 @@ export function useAmap(containerId: string) {
       setDrawnShape(shapeInfo);
       setGridCells([]);
 
-      // Clean up custom draw state & restore drag
+      // Exit draw mode
       cleanupCustomDraw();
       mapInstance.setStatus({ dragEnable: true });
-      setDrawModeState(null); // auto-exit draw mode
+      if (mapEl) mapEl.style.cursor = '';
+      setDrawModeState(null);
+    };
+
+    // --- Escape key: cancel ---
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        cleanupCustomDraw();
+        mapInstance.setStatus({ dragEnable: true });
+        if (mapEl) mapEl.style.cursor = '';
+        setDrawModeState(null);
+      }
     };
 
     cd.clickHandler = onClick;
+    cd.keyDownHandler = onKeyDown;
     mapInstance.on('click', onClick);
+    document.addEventListener('keydown', onKeyDown);
   }, [drawMode, cleanupCustomDraw]);
 
   const getBounds = useCallback(() => {
@@ -553,9 +612,15 @@ export function useAmap(containerId: string) {
     setIsCollecting(false);
   }, []);
 
+  const flyTo = useCallback((lng: number, lat: number) => {
+    if (mapRef.current) {
+      mapRef.current.setZoomAndCenter(16, [lng, lat]);
+    }
+  }, []);
+
   return { map, loaded, getBounds, setDrawMode, clearDrawings, getDrawnShape, splitGrid,
-           drawMode, drawnShape, gridCells, locateMe, collectPOIsClientSide, stopCollecting,
-           poiData, isCollecting };
+           drawMode, drawnShape, gridCells, locateMe, flyTo,
+           collectPOIsClientSide, stopCollecting, poiData, isCollecting };
 }
 
 function mergePois(target: any[], seen: Set<string>, pois: any[], category: string) {

@@ -13,6 +13,7 @@ interface ActiveTask {
   status: TaskStatus;
   categories: string[];
   amapKey?: string;
+  skipDuplicates: boolean;
   onProgress: (data: any) => void;
   onComplete: (data: any) => void;
   onError: (data: any) => void;
@@ -85,6 +86,7 @@ export function startCollection(
     status: 'running',
     categories: req.categories,
     amapKey: req.amapKey?.trim() || undefined,
+    skipDuplicates: req.skipDuplicates || false,
     onProgress,
     onComplete,
     onError,
@@ -154,7 +156,7 @@ async function processNextCell(taskId: string): Promise<void> {
         phone: p.tel || '',
         rating: p.biz_ext?.rating ? parseFloat(p.biz_ext.rating) : null,
       };
-    }));
+    }), task.skipDuplicates);
   }
 
   incrementTaskProgress(taskId, pois.length);

@@ -73,3 +73,89 @@
 [2m23:35:42[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
 [2m23:37:58[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
 [2m23:39:14[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
+[2m23:40:18[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
+[2m23:51:34[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/mobile/MobileApp.tsx[22m
+[2m23:51:39[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m23:51:42[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m23:51:43[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m23:51:47[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx[22m
+[2m23:51:48[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx[22m
+[2m23:52:17[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/mobile/MobileApp.tsx[22m
+[2m23:52:50[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m23:53:22[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m23:53:28[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m23:54:27[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx[22m
+[2m23:56:01[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
+[2m23:56:20[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
+[2m00:03:12[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DrawToolbar.tsx[22m
+[2m00:03:12[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DataTable.tsx[22m
+[2m00:03:20[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:03:35[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:03:39[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:03:48[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:03:53[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:03:57[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:04:15[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:04:23[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:04:39[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:04:47[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:04:58[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:05:29[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SettingsDialog.tsx[22m
+[2m00:05:40[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:13:42[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/app/build/intermediates/assets/debug/mergeDebugAssets/public/index.html[22m
+[2m00:13:47[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
+[2m00:33:15[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx, /src/components/MapView.tsx[22m
+[2m00:33:18[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx, /src/components/MapView.tsx[22m
+[2m00:33:23[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:33:28[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:33:31[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:33:32[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:37:05[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx, /src/components/MapView.tsx[22m
+[2m00:37:12[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx, /src/components/MapView.tsx[22m
+[2m00:37:36[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx, /src/components/MapView.tsx[22m
+[2m00:37:51[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:41:52[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:41:56[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:42:01[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:42:05[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:42:09[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:42:15[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:42:18[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:42:41[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MapView.tsx[22m
+[2m00:42:45[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MapView.tsx[22m
+[2m00:42:50[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx, /src/components/MapView.tsx[22m
+[2m00:42:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:43:11[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:43:41[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:44:00[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:44:06[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:44:35[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:44:38[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:44:43[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:44:49[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:50:36[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:50:44[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:51:22[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/mobile/MobileApp.tsx, /src/components/mobile/StepCategories.tsx, /src/components/mobile/StepCollect.tsx, /src/components/mobile/StepResults.tsx[22m
+[2m00:51:53[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:51:57[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:52:12[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:52:23[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:58:31[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/mobile/MobileApp.tsx[22m
+[2m00:58:35[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:58:39[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:58:45[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m00:58:53[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx[22m
+[2m00:58:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx[22m
+[2m00:59:02[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx[22m
+[2m01:01:21[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/mobile/MobileApp.tsx[22m
+[2m01:01:26[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/mobile/MobileApp.tsx[22m
+[2m01:01:40[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/UpdatePrompt.tsx[22m
+[2m01:01:51[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
+[2m01:01:52[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/mobile/MobileApp.tsx[22m
+[2m01:02:07[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/UpdatePrompt.tsx[22m
+[2m01:02:12[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/UpdatePrompt.tsx[22m
+[2m01:02:17[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/UpdatePrompt.tsx[22m
+[2m01:04:29[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/UpdatePrompt.tsx[22m
+[2m01:04:48[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/UpdatePrompt.tsx[22m
+[2m01:04:52[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/UpdatePrompt.tsx[22m
+[2m01:04:53[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/UpdatePrompt.tsx[22m

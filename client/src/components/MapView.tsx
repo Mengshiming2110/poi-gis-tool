@@ -17,6 +17,7 @@ export interface MapAPI {
   clearDrawings: () => void;
   getDrawnShape: () => DrawnShape | null;
   splitGrid: (gridSizeMeters: number) => number;
+  flyTo: (lng: number, lat: number) => void;
   drawMode: DrawMode;
   drawnShape: DrawnShape | null;
   gridCells: GridCell[];
@@ -35,6 +36,7 @@ function MapView({ children, onMapReady, onShapeChange, onGridChange }: MapViewP
       readyRef.current = true;
       if (onMapReady) {
         onMapReady({
+          flyTo: amap.flyTo,
           getBounds: amap.getBounds,
           setDrawMode: amap.setDrawMode,
           clearDrawings: amap.clearDrawings,

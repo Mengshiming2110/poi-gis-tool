@@ -115,20 +115,33 @@ export function incrementTaskProgress(id: string, newPois: number): void {
 
 // --- POI CRUD ---
 
-export function insertPois(taskId: string, pois: Omit<PoiRecord, 'id' | 'task_id' | 'collected_at'>[]): number {
+export function insertPois(taskId: string, pois: Omit<PoiRecord, 'id' | 'task_id' | 'collected_at'>[], skipDup: boolean = false): number {
   db.run('BEGIN');
   const stmt = db.prepare(
     'INSERT INTO pois (task_id, name, category, subcategory, address, lng, lat, phone, rating) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
+  const dedupStmt = skipDup
+    ? db.prepare('SELECT COUNT(*) as c FROM pois WHERE name = ? AND ABS(lng - ?) < 0.0005 AND ABS(lat - ?) < 0.0005')
+    : null;
+  let inserted = 0;
   for (const item of pois) {
+    if (dedupStmt) {
+      dedupStmt.bind([item.name, item.lng, item.lat]);
+      dedupStmt.step();
+      const { c } = dedupStmt.getAsObject() as { c: number };
+      dedupStmt.reset();
+      if (c > 0) continue; // skip duplicate
+    }
     stmt.bind([taskId, item.name, item.category, item.subcategory, item.address, item.lng, item.lat, item.phone, item.rating]);
     stmt.step();
     stmt.reset();
+    inserted++;
   }
+  if (dedupStmt) dedupStmt.free();
   stmt.free();
   db.run('COMMIT');
   saveDb();
-  return pois.length;
+  return inserted;
 }
 
 export function queryPois(params: {
