@@ -20,7 +20,7 @@ export interface MapAPI {
   drawMode: DrawMode;
   drawnShape: DrawnShape | null;
   gridCells: GridCell[];
-  collectPOIsClientSide: (cells: GridCell[], categories: string[], categoryNames: Record<string, string>, gridSizeMeters: number, onCellProgress: (done: number, total: number) => void) => Promise<any[]>;
+  collectPOIsClientSide: (cells: GridCell[], categories: string[], categoryNames: Record<string, string>, gridSizeMeters: number, onCellProgress: (done: number, total: number, pois: number) => void) => Promise<any[]>;
   stopCollecting: () => void;
   poiData: any[];
   isCollecting: boolean;

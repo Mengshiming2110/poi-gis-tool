@@ -1,92 +1,111 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { startCollection, getProgressUrl } from '../../services/api';
+import React, { useState, useEffect } from 'react';
 import type { GridCell } from '../../hooks/useAmap';
+import { CATEGORY_LIST as CATS } from '../../types/poi';
+
+const CATEGORY_NAMES: Record<string, string> = {};
+CATS.forEach(c => { CATEGORY_NAMES[c.code] = c.name; });
 
 interface Props {
   categories: string[];
   gridCells: GridCell[];
+  collectPOIsClientSide: (
+    cells: GridCell[],
+    categories: string[],
+    categoryNames: Record<string, string>,
+    gridSizeMeters: number,
+    onCellProgress: (done: number, total: number, pois: number) => void,
+  ) => Promise<any[]>;
+  stopCollecting: () => void;
   onComplete: (pois: any[]) => void;
 }
 
-function StepCollect({ categories, gridCells, onComplete }: Props) {
-  const [progress, setProgress] = useState({ done: 0, total: gridCells.length, pois: 0 });
-  const [status, setStatus] = useState<'running' | 'paused' | 'done'>('running');
-  const esRef = useRef<EventSource | null>(null);
+function StepCollect({ categories, gridCells, collectPOIsClientSide, stopCollecting: stop, onComplete }: Props) {
+  const [resolved, setResolved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(0);
+  const [total] = useState(gridCells.length * categories.length);
+  const [poiCount, setPoiCount] = useState(0);
+  const [status, setStatus] = useState<'running' | 'done'>('running');
 
   useEffect(() => {
     let cancelled = false;
 
-    const start = async () => {
+    const run = async () => {
       try {
-        // Try desktop backend
-        const result = await startCollection({
-          mode: 'region',
+        // Estimate grid cell size from first cell
+        const c0 = gridCells[0];
+        const gridSizeMeters = c0
+          ? Math.round(((c0.ne[1] - c0.sw[1]) * 111320 + (c0.ne[0] - c0.sw[0]) * 111320 * Math.cos(((c0.sw[1] + c0.ne[1]) / 2 * Math.PI) / 180)) / 2)
+          : 500;
+
+        const pois = await collectPOIsClientSide(
+          gridCells,
           categories,
-          bounds: {
-            southwest: { lng: gridCells[0]?.sw[0] || 0, lat: gridCells[0]?.sw[1] || 0 },
-            northeast: { lng: gridCells[gridCells.length - 1]?.ne[0] || 0, lat: gridCells[gridCells.length - 1]?.ne[1] || 0 },
+          CATEGORY_NAMES,
+          gridSizeMeters,
+          (d, t, realPois) => {
+            if (!cancelled) {
+              setDone(d);
+              setPoiCount(realPois);
+            }
           },
-        });
+        );
 
-        // SSE progress tracking
-        const es = new EventSource(getProgressUrl(result.taskId));
-        esRef.current = es;
-
-        es.addEventListener('progress', (e) => {
-          const d = JSON.parse(e.data);
-          if (!cancelled) {
-            setProgress({ done: d.doneCells, total: d.totalCells, pois: d.totalPois });
-          }
-        });
-
-        es.addEventListener('complete', (e) => {
-          const d = JSON.parse(e.data);
-          if (!cancelled) {
-            setStatus('done');
-            onComplete(Array(d.totalPois || 0).fill(null)); // placeholder
-          }
-          es.close();
-        });
-
-        es.onerror = () => {
-          if (!cancelled) setStatus('done'); // fallback
-        };
-      } catch {
-        // Backend unreachable — done immediately for now
         if (!cancelled) {
+          setResolved(true);
+          if (pois.length > 0) {
+            setStatus('done');
+            setPoiCount(pois.length);
+            onComplete(pois);
+          } else {
+            setError('搜索完成但未找到任何POI数据。请确认区域内有目标类别的兴趣点，或检查网络连接。');
+            setStatus('done');
+          }
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setResolved(true);
+          setError(`采集出错: ${e?.message || '未知错误'}`);
           setStatus('done');
-          onComplete([]);
         }
       }
     };
 
-    start();
+    run();
 
     return () => {
       cancelled = true;
-      esRef.current?.close();
+      stop();
     };
   }, []);
 
-  const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  // Error / empty state
+  if (resolved && error) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 24 }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+        <div style={{ fontSize: 14, color: '#ef4444', textAlign: 'center', marginBottom: 8, maxWidth: 280 }}>{error}</div>
+        <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', marginBottom: 24 }}>
+          已完成 {done}/{total} 个搜索任务
+        </div>
+        <button className="mobile-btn mobile-btn-primary" onClick={() => onComplete([])}>
+          查看结果 (0条)
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 24 }}>
       <div className="collect-ring" style={{ position: 'relative' }}>
         <svg width="200" height="200" viewBox="0 0 200 200" style={{ position: 'absolute', top: -8, left: -8 }}>
           <circle cx="100" cy="100" r="92" fill="none" stroke="#e2e8f0" strokeWidth="8" />
-          {status === 'running' && (
-            <circle cx="100" cy="100" r="92" fill="none" stroke="#3b82f6" strokeWidth="8"
-              strokeDasharray={`${2 * Math.PI * 92 * pct / 100} ${2 * Math.PI * 92}`}
-              strokeLinecap="round" transform="rotate(-90 100 100)"
-              style={{ transition: 'stroke-dasharray 0.3s' }}
-            />
-          )}
-          <circle cx="100" cy="100" r="92" fill="none" stroke="#22c55e" strokeWidth="8"
-            strokeDasharray={`${2 * Math.PI * 92 * (pct / 100)}`}
+          <circle cx="100" cy="100" r="92" fill="none" stroke={status === 'done' ? '#22c55e' : '#3b82f6'} strokeWidth="8"
+            strokeDasharray={`${2 * Math.PI * 92 * pct / 100} ${2 * Math.PI * 92}`}
             strokeLinecap="round" transform="rotate(-90 100 100)"
-            opacity={status === 'done' ? 1 : 0}
-            style={{ transition: 'opacity 0.3s' }}
+            style={{ transition: 'stroke-dasharray 0.3s' }}
           />
         </svg>
         <span style={{ fontSize: 48, fontWeight: 800, color: status === 'done' ? '#22c55e' : '#3b82f6' }}>
@@ -99,18 +118,18 @@ function StepCollect({ categories, gridCells, onComplete }: Props) {
 
       <div style={{ display: 'flex', gap: 40, marginTop: 32 }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>{progress.pois}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>{poiCount}</div>
           <div style={{ fontSize: 13, color: '#94a3b8' }}>POI</div>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>{progress.done}/{progress.total}</div>
-          <div style={{ fontSize: 13, color: '#94a3b8' }}>格子</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>{done}/{total}</div>
+          <div style={{ fontSize: 13, color: '#94a3b8' }}>搜索任务</div>
         </div>
       </div>
 
       {status === 'running' && (
         <button className="mobile-btn mobile-btn-secondary" style={{ marginTop: 40, width: 140 }}
-          onClick={() => { esRef.current?.close(); setStatus('done'); }}>
+          onClick={() => { stop(); setStatus('done'); }}>
           暂停
         </button>
       )}

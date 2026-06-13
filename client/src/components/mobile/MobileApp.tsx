@@ -5,22 +5,31 @@ import StepDraw from './StepDraw';
 import StepGrid from './StepGrid';
 import StepCollect from './StepCollect';
 import StepResults from './StepResults';
-import { useAmap, type DrawnShape, type GridCell } from '../../hooks/useAmap';
+import { useAmap, type DrawnShape } from '../../hooks/useAmap';
 
 function MobileApp() {
   const [step, setStep] = useState(1);
   const [categories, setCategories] = useState<string[]>([]);
   const [drawnShape, setDrawnShape] = useState<DrawnShape | null>(null);
-  const [gridCells, setGridCells] = useState<GridCell[]>([]);
   const [poiData, setPoiData] = useState<any[]>([]);
+  const [locating, setLocating] = useState(false);
 
   // Single shared map instance for steps 2-3
   const amap = useAmap('mobile-map');
 
+  const handleLocate = async () => {
+    setLocating(true);
+    const ok = await amap.locateMe();
+    setLocating(false);
+    if (!ok) {
+      // Could show a toast here
+    }
+  };
+
   const canNext = () => {
     if (step === 1) return categories.length > 0;
     if (step === 2) return !!drawnShape;
-    if (step === 3) return gridCells.length > 0;
+    if (step === 3) return amap.gridCells.length > 0;
     return true;
   };
 
@@ -29,7 +38,7 @@ function MobileApp() {
 
   const restart = () => {
     setStep(1); setPoiData([]); setCategories([]);
-    setDrawnShape(null); setGridCells([]);
+    setDrawnShape(null);
     amap.clearDrawings();
   };
 
@@ -43,6 +52,26 @@ function MobileApp() {
           width: '100%', height: '100%',
           display: (step === 2 || step === 3) ? 'block' : 'none',
         }} />
+
+        {/* Locate button — overlay on map, steps 2-3 */}
+        {(step === 2 || step === 3) && (
+          <button
+            onClick={handleLocate}
+            disabled={locating}
+            title="定位到当前位置"
+            style={{
+              position: 'absolute', bottom: 100, right: 12, zIndex: 20,
+              width: 40, height: 40, borderRadius: '50%',
+              border: '2px solid #fff', background: '#1e293b', color: '#fff',
+              fontSize: 18, cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+              pointerEvents: 'auto', opacity: locating ? 0.5 : 1,
+            }}
+          >
+            {locating ? '⟳' : '⌖'}
+          </button>
+        )}
 
         {/* Step 1: Categories */}
         {step === 1 && <StepCategories selected={categories} onChange={setCategories} />}
@@ -64,9 +93,8 @@ function MobileApp() {
           <StepGrid
             loaded={amap.loaded}
             drawnShape={drawnShape}
-            gridCells={gridCells}
+            gridCells={amap.gridCells}
             splitGrid={amap.splitGrid}
-            onGridChange={setGridCells}
           />
         )}
 
@@ -74,13 +102,15 @@ function MobileApp() {
         {step === 4 && (
           <StepCollect
             categories={categories}
-            gridCells={gridCells}
+            gridCells={amap.gridCells}
+            collectPOIsClientSide={amap.collectPOIsClientSide}
+            stopCollecting={amap.stopCollecting}
             onComplete={(pois: any[]) => { setPoiData(pois); setStep(5); }}
           />
         )}
 
         {/* Step 5: Results */}
-        {step === 5 && <StepResults pois={poiData} onRestart={restart} />}
+        {step === 5 && <StepResults pois={poiData} categories={categories} onRestart={restart} />}
       </div>
 
       {step < 4 && (

@@ -1,7 +1,7 @@
-# 手机端 APP 重新设计 — 设计文档
+# 手机端 APP 重新设计 — 设计文档 v2
 
 **日期**: 2026-06-13
-**状态**: 已确认
+**状态**: 已实现（含多轮迭代修复）
 
 ---
 
@@ -28,8 +28,8 @@
 | 1 选择类别 | 全屏标签云+搜索 | 多选 POI 类别 → 下一步 |
 | 2 绘制区域 | 全屏地图+底部绘图工具条 | 多边形/矩形/圆形 → 完成 → 下一步 |
 | 3 网格切分 | 全屏地图+网格覆盖+精度调节 | 滑块调精度 → 切分 → 下一步 |
-| 4 采集 | 全屏进度+动画+POI 计数 | 自动采集 → 可暂停/取消 → 完成到下一步 |
-| 5 查看结果 | POI 列表+地图标注+导出 | 浏览数据 → 导出 Excel/GeoJSON → 完成 |
+| 4 采集 | 全屏进度+动画+POI 计数 | 自动采集 → 可暂停/完成到下一步 |
+| 5 查看结果 | POI 列表+导出+云同步 | 浏览/导出/分享/同步云端 → 完成 |
 
 ## 3. 技术架构
 
@@ -45,119 +45,121 @@ client/src/
 │   ├── ProgressDrawer.tsx
 │   ├── DataTable.tsx
 │   ├── SettingsDialog.tsx
+│   ├── CloudPanel.tsx         ← 桌面端云端任务拉取面板
 │   │
-│   └── mobile/               ← 新建移动专属组件
+│   └── mobile/               ← 移动专属组件
 │       ├── StepIndicator.tsx      ← 顶部步骤进度条
 │       ├── StepCategories.tsx     ← 步骤1: 分类选择
 │       ├── StepDraw.tsx           ← 步骤2: 区域绘制
 │       ├── StepGrid.tsx           ← 步骤3: 网格切分
 │       ├── StepCollect.tsx        ← 步骤4: 采集进度
-│       ├── StepResults.tsx        ← 步骤5: 结果查看
+│       ├── StepResults.tsx        ← 步骤5: 结果查看+导出+同步
 │       └── MobileApp.tsx          ← 移动版 App 根组件
-├── hooks/                    ← 共享，不动
-│   ├── useAmap.ts
-│   ├── useCollection.ts
-│   └── useSSE.ts
+├── hooks/                    ← 共享
+│   └── useAmap.ts            ← 核心地图 hook（map/绘图/网格/采集）
 ├── services/
 │   ├── api.ts                ← 桌面后端 API
-│   └── supabase.ts           ← Supabase 客户端 (新增)
+│   └── supabase.ts           ← Supabase 客户端（读写）
 └── types/
-    └── poi.ts
+    └── poi.ts                ← POI 类型 + CATEGORY_LIST
 ```
 
-## 4. 数据流
+## 4. 数据流（迭代后）
 
 ```
-手机 APK (Capacitor)
+手机 APK (Capacitor WebView)
     │
-    ├─ 采集请求 ──→ 先试局域网桌面后端 (http://{desktop_ip}:3001)
-    │                   │
-    │                   ├─ 连上了 → Express + 高德 REST API → 完整采集
-    │                   └─ 连不上 → PlaceSearch 降级采集 (轻量)
+    ├─ 采集 ──→ 高德 REST API (fetch → restapi.amap.com)
+    │              │
+    │              ├─ WebView 不限制 CORS，fetch 直连可用
+    │              └─ PlaceSearch (JSONP) 在 WebView 不可靠，已废弃
     │
-    ├─ POI 数据写入 → Supabase (所有采集结果统一写入 Supabase)
+    ├─ 同步云端 → Supabase (createCloudTask + insertCloudPois)
     │
-    └─ 数据读取 ← Supabase (任务列表、POI 数据)
-    
+    └─ 定位 ──→ navigator.geolocation (需 Android 权限)
+
 桌面 Electron
     │
-    ├─ POI 数据双写 → Supabase (已有 cloud.ts 实现)
-    └─ 手机采的数据自动同步 ← Supabase Realtime
+    ├─ CloudPanel ☁️ → 拉取 Supabase 任务列表 → 导出 CSV
+    └─ 采集用桌面后端 Express + REST API
 ```
 
-## 5. 组件设计
+### 采集关键决策
+
+- **不用 PlaceSearch**：AMap JS SDK 的 PlaceSearch 插件在 WebView 中 JSONP 调用不可靠，静默返回空
+- **改用 REST API**：`fetch()` 直连 `restapi.amap.com/v3/place/around`，支持自动翻页
+- **错误上浮**：API 错误不再静默吞掉，抛到 StepCollect 显示具体报错信息
+
+## 5. 组件设计（实现版）
 
 ### 5.1 MobileApp.tsx（根组件）
 
-- 管理当前步骤状态 `step: 1-5`
-- 管理步骤间共享数据: `selectedCategories`, `drawnShape`, `gridCells`, `poiData`
-- 渲染 `StepIndicator` + 当前步骤组件
-- 底部"上一步/下一步"导航
+- 共享单个 `useAmap('mobile-map')` 实例，步骤 2-3 共用同一地图
+- 地图 div 在步骤 2-3 持续存在（display 切换，不销毁重建）
+- 步骤 2/3 地图右下角显示 `⌖` 定位按钮，调用 `amap.locateMe()`
+- `canNext()` 直接读取 `amap.gridCells.length`（避免双数据源不同步）
+- 底部导航：步骤 1-3 显示"上一步/下一步"，步骤 4-5 由各自组件处理
 
 ### 5.2 StepIndicator.tsx
 
 - 横向步骤条: ● 类别 — ● 区域 — ● 网格 — ○ 采集 — ○ 结果
 - 当前步骤高亮蓝色，已完成绿色，未完成灰色
-- 点击已完成步骤可跳回（编辑）
+- 点击已完成步骤可跳回
 
 ### 5.3 StepCategories.tsx
 
-- 全屏标签云（大触控标签，至少 44dp 高）
-- 顶部搜索框
-- 已选数量显示
-- 底部"下一步"按钮（至少选了1个才亮）
-- 样式: 标签用 category 对应的颜色
+- 全屏标签云（48dp 触控目标），搜索框实时过滤
+- 标签用 category 对应的颜色，选中态显示实心
 
 ### 5.4 StepDraw.tsx
 
-- 全屏地图（高德 JS API in WebView）
+- 接收 amap API 作为 **props**（不自己调 useAmap）
 - 底部浮动工具栏: ⬠ 多边形 / ▭ 矩形 / ◯ 圆形 / ✕ 清除
-- 按钮最小 48x48dp 触控面积
-- 绘制完成后地图上出现形状覆盖层
-- Toast 提示"区域已绘制"
-- "下一步"需要已绘制区域才亮
+- **触屏绘制适配**（关键迭代）：
+  - **多边形**：MouseTool 点击加点，触屏可用，保持不变
+  - **矩形/圆形**：MouseTool 拖拽在触屏不走 `mousedown` 事件链 → 改用**两点点击法**（第一下打锚点→脉冲标记，第二下生成图形）
+  - 绘制时 `map.setStatus({ dragEnable: false })` 禁用地图拖拽，绘制完成恢复
+- 绘制完成自动退出绘制模式
+- Poll `getDrawnShape()` 每 500ms 检测完成
 
 ### 5.5 StepGrid.tsx
 
-- 全屏地图（显示已绘制区域 + 网格覆盖层）
-- 底部面板: 精度滑块（100m-2000m）+ 预设按钮（500/1000/1500）
-- "执行切分" 按钮 → 地图上显示蓝色半透明网格
-- 显示网格数量
-- "下一步"需要已切分才亮
+- 接收 amap API 作为 **props**
+- 底部面板: 精度滑块（100m-2000m）+ 预设按钮（500/1000/1500m）
+- "执行切分" 按钮 → 地图上显示蓝色半透明网格 + 黄色网格数 badge
+- 网格数从 `amap.gridCells` 直接读取（非本地 state，避免同步断裂）
 
 ### 5.6 StepCollect.tsx
 
-- 全屏采集进度视图
-- 大圆形进度环（中文字体）
-- 实时统计: POI 数量、当前格子/总格子、耗时
-- 暂停 / 取消按钮
-- 采集完成自动跳步骤5
-- 后端连接状态指示（桌面后端 / PlaceSearch 降级）
+- 接收 `collectPOIsClientSide` 和 `stopCollecting` 作为 props
+- 调用高德 REST API 采集，每格×每类逐次搜索，200ms 间隔防限流
+- 进度环 + 实时统计：**真实 POI 累计数**（非任务数）+ 当前搜索任务/总任务
+- 异常处理：
+  - 采集结果为空 → 显示错误页（含搜索统计）
+  - API 报错 → 显示具体错误信息（如 `OVER_DAILY_QUOTA`）
+- "查看结果(0条)" 按钮允许强制进入结果页
 
 ### 5.7 StepResults.tsx
 
-- POI 列表（大行高 56dp，左颜色点+名称+类别）
-- 点击某条 → 回到步骤2地图标注该 POI
-- 导出按钮: Excel / GeoJSON
-- "完成"回到步骤1开始新采集
+- POI 列表（56dp 行高，左颜色点+名称+类别+地址）
+- **四个导出按钮**：
+  | 📤 分享 | 调起系统分享面板（Web Share API），传 CSV 文件 |
+  | 📋 复制CSV | 复制 CSV 到剪贴板 |
+  | 📄 CSV | 下载 .csv 文件 |
+  | 🗺 GeoJSON | 下载 .geojson 文件 |
+- **☁️ 同步云端**：上传到 Supabase（createCloudTask → insertCloudPois 批量写入），按钮变绿 ✅
+- "完成" 按钮 → 回到步骤 1
 
-## 6. 后端连接策略
+## 6. 云同步（桌面 ↔ 手机）
 
-```typescript
-// 双层降级
-async function getCollector() {
-  // 1. 先试桌面后端
-  try {
-    const res = await fetch(`http://${desktopIp}:3001/api/health`, { signal: AbortSignal.timeout(2000) });
-    if (res.ok) return 'desktop'; // 用 Express + REST API
-  } catch {}
-  
-  // 2. 降级到 PlaceSearch
-  return 'placesearch'; // 浏览器端 JS API
-}
+```
+手机采集完成 → 点 ☁️ 同步云端 → Supabase
+桌面端右下角 ☁️ 按钮 → 拉取云端任务列表 → 点任务展开 → 📥 导出 CSV
 ```
 
-桌面后端 IP 通过 Settings 配置，存入 localStorage。
+- 使用 Supabase publishable key，客户端直接读写（RLS 全开）
+- 写入分批 50 条/次避免请求体积过大
+- 桌面 `CloudPanel` 组件独立浮动，不干扰采集流程
 
 ## 7. 移动端样式规范
 
@@ -169,10 +171,12 @@ async function getCollector() {
 | 面板背景 | rgba(255,255,255,0.95) | #fff 不透明 |
 | 间距单位 | 4px | 8px |
 | 标签云标签 | 内联 | 自适应 grid |
-| 地图高度 | 100vh | calc(100vh - 120px) 留底部空间 |
+| 定位按钮 | 地图右下角 | 地图右下角（步骤2-3显示） |
 
-## 8. 未纳入范围
+## 8. 已知限制 / 未纳入
 
 - iOS 适配（当前仅 Android APK）
 - 离线采集（无网络时缓存+同步）
-- 地图 POI 标记渲染（步骤2仅绘制，步骤5才看数据）
+- 地图 POI 标记渲染（步骤5列表查看，不做地图标注）
+- REST API 有日配额限制（`125c253ac5c0c03f9165bc3c721d130f`），超额后需等次日重置
+- 桌面 EXE 需关闭 Windows SmartScreen 或手动信任（无代码签名）

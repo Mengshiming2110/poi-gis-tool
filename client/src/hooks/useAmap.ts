@@ -39,6 +39,35 @@ export function useAmap(containerId: string) {
   const [isCollecting, setIsCollecting] = useState(false);
   const collectingRef = useRef(false);
 
+  // Custom two-tap drawing state (replaces MouseTool for rect/circle on touch devices)
+  const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0);
+  const customDrawRef = useRef<{
+    phase: 'idle' | 'first-point';
+    firstPoint: [number, number] | null;
+    anchorMarker: any;
+    clickHandler: ((e: any) => void) | null;
+  }>({
+    phase: 'idle',
+    firstPoint: null,
+    anchorMarker: null,
+    clickHandler: null,
+  });
+
+  const cleanupCustomDraw = useCallback(() => {
+    const cd = customDrawRef.current;
+    const inst = mapRef.current;
+    if (cd.anchorMarker && inst) {
+      try { inst.remove(cd.anchorMarker); } catch (e) {}
+    }
+    if (cd.clickHandler && inst) {
+      inst.off('click', cd.clickHandler);
+    }
+    cd.phase = 'idle';
+    cd.firstPoint = null;
+    cd.anchorMarker = null;
+    cd.clickHandler = null;
+  }, []);
+
   // Poll until window.AMap is available, then init
   useEffect(() => {
     let destroyed = false;
@@ -95,6 +124,8 @@ export function useAmap(containerId: string) {
             setGridCells([]);
           }
           mouseTool.close(true);
+          // Re-enable map drag after drawing completes
+          instance.setStatus({ dragEnable: true });
         });
 
         const placeSearch = new AMap.PlaceSearch({ pageSize: 25, pageIndex: 1 });
@@ -141,29 +172,128 @@ export function useAmap(containerId: string) {
     setDrawModeState(mode);
   }, []);
 
+  // Toggle map drag when draw mode changes (prevents conflict on mobile)
   useEffect(() => {
     const mt = mouseToolRef.current;
-    if (!mt) return;
+    const mapInstance = mapRef.current;
+    if (!mapInstance) return;
 
-    mt.close(true);
+    // Clean up any custom two-tap draw in progress
+    cleanupCustomDraw();
+    if (mt) mt.close(true);
 
-    if (!drawMode) return;
+    if (!drawMode) {
+      mapInstance.setStatus({ dragEnable: true });
+      return;
+    }
 
-    const styleOpts = {
-      strokeWeight: 3,
-      strokeOpacity: 0.8,
-      fillOpacity: 0.15,
-      strokeStyle: 'dashed',
-    };
+    // Disable map dragging while in draw mode (critical for mobile)
+    mapInstance.setStatus({ dragEnable: false });
 
     if (drawMode === 'polygon') {
-      mt.polygon({ ...styleOpts, strokeColor: '#4A90D9', fillColor: '#4A90D9' });
-    } else if (drawMode === 'rectangle') {
-      mt.rectangle({ ...styleOpts, strokeColor: '#27AE60', fillColor: '#27AE60' });
-    } else if (drawMode === 'circle') {
-      mt.circle({ ...styleOpts, strokeColor: '#F39C12', fillColor: '#F39C12' });
+      // Polygon: always use MouseTool (tap-to-add-points works on touch)
+      if (!mt) return;
+      mt.polygon({
+        strokeColor: '#4A90D9', fillColor: '#4A90D9',
+        strokeWeight: 3, strokeOpacity: 0.8, fillOpacity: 0.15, strokeStyle: 'dashed',
+      });
+      return;
     }
-  }, [drawMode]);
+
+    // Rectangle / Circle on touch devices → custom two-tap drawing
+    // On mouse devices → keep MouseTool drag-to-draw
+    if (!isTouchDevice) {
+      if (!mt) return;
+      if (drawMode === 'rectangle') {
+        mt.rectangle({
+          strokeColor: '#27AE60', fillColor: '#27AE60',
+          strokeWeight: 3, strokeOpacity: 0.8, fillOpacity: 0.15, strokeStyle: 'dashed',
+        });
+      } else {
+        mt.circle({
+          strokeColor: '#F39C12', fillColor: '#F39C12',
+          strokeWeight: 3, strokeOpacity: 0.8, fillOpacity: 0.15, strokeStyle: 'dashed',
+        });
+      }
+      return;
+    }
+
+    // --- Touch: two-tap custom drawing ---
+    const AMap = window.AMap;
+    const cd = customDrawRef.current;
+
+    const onClick = (e: any) => {
+      const point: [number, number] = [e.lnglat.lng, e.lnglat.lat];
+
+      if (cd.phase === 'idle') {
+        // Tap 1: place anchor marker
+        cd.phase = 'first-point';
+        cd.firstPoint = point;
+        const marker = new AMap.Marker({
+          position: e.lnglat,
+          anchor: 'center',
+          content: `<div style="
+            width:16px;height:16px;
+            background:${drawMode === 'rectangle' ? '#27AE60' : '#F39C12'};
+            border:3px solid #fff;border-radius:50%;
+            box-shadow:0 2px 6px rgba(0,0,0,0.5);
+            animation:pulse 0.8s infinite;
+          "></div>`,
+        });
+        marker.setMap(mapInstance);
+        cd.anchorMarker = marker;
+        return;
+      }
+
+      // Tap 2: create shape from anchor → tap point
+      const first = cd.firstPoint!;
+      let shapeInfo: DrawnShape | null = null;
+
+      if (drawMode === 'rectangle') {
+        const sw: [number, number] = [Math.min(first[0], point[0]), Math.min(first[1], point[1])];
+        const ne: [number, number] = [Math.max(first[0], point[0]), Math.max(first[1], point[1])];
+        const rectPath: [number, number][] = [sw, [ne[0], sw[1]], ne, [sw[0], ne[1]]];
+        const rect = new AMap.Rectangle({
+          bounds: new AMap.Bounds(new AMap.LngLat(sw[0], sw[1]), new AMap.LngLat(ne[0], ne[1])),
+          strokeColor: '#27AE60', fillColor: '#27AE60',
+          strokeWeight: 3, strokeOpacity: 0.8, fillOpacity: 0.15, strokeStyle: 'dashed',
+        });
+        rect.setMap(mapInstance);
+        shapeInfo = { type: 'rectangle', geometry: { path: rectPath, bounds: [sw, ne] }, overlay: rect };
+      } else {
+        // circle: anchor = center, tap = edge point → radius
+        const latDiff = (point[1] - first[1]) * 111320;
+        const lngDiff = (point[0] - first[0]) * 111320 * Math.cos((first[1] * Math.PI) / 180);
+        const radius = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+        const circle = new AMap.Circle({
+          center: new AMap.LngLat(first[0], first[1]),
+          radius,
+          strokeColor: '#F39C12', fillColor: '#F39C12',
+          strokeWeight: 3, strokeOpacity: 0.8, fillOpacity: 0.15, strokeStyle: 'dashed',
+        });
+        circle.setMap(mapInstance);
+        shapeInfo = { type: 'circle', geometry: { center: first, radius }, overlay: circle };
+      }
+
+      // Clean up old shape
+      if (drawnShapeRef.current?.overlay) {
+        try { mapInstance.remove(drawnShapeRef.current.overlay); } catch (e) {}
+      }
+      gridOverlaysRef.current.forEach(o => { try { mapInstance.remove(o); } catch (e) {} });
+      gridOverlaysRef.current = [];
+      drawnShapeRef.current = shapeInfo;
+      setDrawnShape(shapeInfo);
+      setGridCells([]);
+
+      // Clean up custom draw state & restore drag
+      cleanupCustomDraw();
+      mapInstance.setStatus({ dragEnable: true });
+      setDrawModeState(null); // auto-exit draw mode
+    };
+
+    cd.clickHandler = onClick;
+    mapInstance.on('click', onClick);
+  }, [drawMode, cleanupCustomDraw]);
 
   const getBounds = useCallback(() => {
     if (!mapRef.current) return null;
@@ -175,6 +305,8 @@ export function useAmap(containerId: string) {
   }, []);
 
   const clearDrawings = useCallback(() => {
+    // Clean up custom two-tap drawing if in progress
+    cleanupCustomDraw();
     if (drawnShapeRef.current?.overlay && mapRef.current) {
       try { mapRef.current.remove(drawnShapeRef.current.overlay); } catch (e) {}
     }
@@ -183,7 +315,9 @@ export function useAmap(containerId: string) {
     drawnShapeRef.current = null;
     setDrawnShape(null);
     setGridCells([]);
-  }, []);
+    setDrawModeState(null);
+    mapRef.current?.setStatus({ dragEnable: true });
+  }, [cleanupCustomDraw]);
 
   const getDrawnShape = useCallback((): DrawnShape | null => {
     return drawnShapeRef.current;
@@ -246,25 +380,48 @@ export function useAmap(containerId: string) {
     return validCells.length;
   }, []);
 
-  const locateMe = useCallback(() => {
-    if (!mapRef.current || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => { try { mapRef.current.setZoomAndCenter(15, [pos.coords.longitude, pos.coords.latitude]); } catch (e) {} },
-      () => {},
-      { timeout: 5000, enableHighAccuracy: true }
-    );
+  const locateMe = useCallback((): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (!mapRef.current) { resolve(false); return; }
+      if (!navigator.geolocation) {
+        console.warn('[Locate] 浏览器不支持定位');
+        resolve(false);
+        return;
+      }
+      // Try high-accuracy first, fall back to low-accuracy
+      const tryLocate = (highAccuracy: boolean) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            try {
+              mapRef.current.setZoomAndCenter(17, [pos.coords.longitude, pos.coords.latitude]);
+              resolve(true);
+            } catch (e) {
+              resolve(false);
+            }
+          },
+          (err) => {
+            console.warn(`[Locate] 定位失败 (highAccuracy=${highAccuracy}):`, err.message);
+            resolve(false);
+          },
+          { timeout: 8000, enableHighAccuracy: highAccuracy },
+        );
+      };
+      tryLocate(true);
+    });
   }, []);
 
-  // Client-side POI collection using PlaceSearch (temp, avoids REST API quota)
+  // Client-side POI collection using AMap REST API (reliable on both mobile + desktop)
   const collectPOIsClientSide = useCallback(async (
     cells: GridCell[],
     categories: string[],
     categoryNames: Record<string, string>,
     gridSizeMeters: number,
-    onCellProgress: (done: number, total: number) => void,
+    onCellProgress: (done: number, total: number, pois: number) => void,
   ): Promise<any[]> => {
-    const ps = placeSearchRef.current;
-    if (!ps || cells.length === 0) return [];
+    if (cells.length === 0) return [];
+
+    const REST_KEY = localStorage.getItem('amap_rest_key') || '125c253ac5c0c03f9165bc3c721d130f';
+    const PAGE_SIZE = 25;
 
     setIsCollecting(true);
     collectingRef.current = true;
@@ -273,43 +430,49 @@ export function useAmap(containerId: string) {
     const seen = new Set<string>();
     const totalTasks = cells.length * categories.length;
     let done = 0;
+    let firstError: string | null = null;
 
     for (const cell of cells) {
       if (!collectingRef.current) break;
       for (const catCode of categories) {
         if (!collectingRef.current) break;
         try {
-          const results = await new Promise<any[]>((resolve) => {
-            ps.setType(catCode);
-            const radius = Math.max(gridSizeMeters * 0.75, 150);
-            console.log(`[PlaceSearch] 搜索: cat=${catCode} center=${cell.center} radius=${radius}`);
-            ps.searchNearBy('', [cell.center[0], cell.center[1]], radius,
-              (status: string, result: any) => {
-                console.log(`[PlaceSearch] 回调: status=${status} hasPois=${!!result?.poiInfo?.pois} count=${result?.poiInfo?.pois?.length || 0}`, result?.info || '');
-                if (status === 'complete' && result?.poiInfo?.pois) resolve(result.poiInfo.pois);
-                else resolve([]);
-              }
-            );
-          });
-          results.forEach((poi: any) => {
-            const key = poi.id || `${poi.name}_${poi.location?.lng?.toFixed(5)}_${poi.location?.lat?.toFixed(5)}`;
+          const radius = Math.max(gridSizeMeters * 0.75, 150);
+
+          // Fetch page 1
+          const { pois: page1, total: count } = await fetchAmapPOIs(
+            REST_KEY, cell.center, radius, catCode, 1, PAGE_SIZE,
+          );
+
+          page1.forEach((poi: any) => {
+            const key = poi.id || `${poi.name}_${poi.lng?.toFixed(5)}_${poi.lat?.toFixed(5)}`;
             if (!seen.has(key)) {
               seen.add(key);
-              allPois.push({
-                id: poi.id || '',
-                name: poi.name || '未知',
-                category: categoryNames[catCode] || catCode,
-                subcategory: poi.type?.split(';')[0] || '',
-                address: poi.address || '',
-                lng: poi.location?.lng || cell.center[0],
-                lat: poi.location?.lat || cell.center[1],
-                phone: poi.tel || '',
-              });
+              allPois.push({ ...poi, category: categoryNames[catCode] || catCode });
             }
           });
-        } catch (e) { console.warn('搜索出错:', e); }
+
+          // Fetch remaining pages
+          const pages = Math.ceil(count / PAGE_SIZE);
+          for (let p = 2; p <= Math.min(pages, 4); p++) {
+            if (!collectingRef.current) break;
+            const { pois: pagePois } = await fetchAmapPOIs(
+              REST_KEY, cell.center, radius, catCode, p, PAGE_SIZE,
+            );
+            pagePois.forEach((poi: any) => {
+              const key = poi.id || `${poi.name}_${poi.lng?.toFixed(5)}_${poi.lat?.toFixed(5)}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                allPois.push({ ...poi, category: categoryNames[catCode] || catCode });
+              }
+            });
+          }
+        } catch (e: any) {
+          console.warn('[REST] 搜索出错:', e);
+          if (!firstError) firstError = e?.message || String(e);
+        }
         done++;
-        onCellProgress(done, totalTasks);
+        onCellProgress(done, totalTasks, allPois.length);
         await new Promise(r => setTimeout(r, 200));
       }
     }
@@ -318,6 +481,11 @@ export function useAmap(containerId: string) {
     setIsCollecting(false);
     collectingRef.current = false;
     console.log(`[Client] 采集完成: ${allPois.length} 条POI`);
+
+    // If all searches failed, throw so the UI can show the error
+    if (allPois.length === 0 && firstError) {
+      throw new Error(firstError);
+    }
     return allPois;
   }, []);
 
@@ -352,6 +520,47 @@ function pointInCircle(point: [number, number], center: [number, number], radius
   const latDiff = (py - cy) * 111320;
   const lngDiff = (px - cx) * 111320 * Math.cos((cy * Math.PI) / 180);
   return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff) <= radiusMeters;
+}
+
+// Fetch POIs from AMap REST API v3 (works in WebView where PlaceSearch JSONP may not)
+async function fetchAmapPOIs(
+  key: string, center: [number, number], radius: number,
+  category: string, page: number, pageSize: number,
+): Promise<{ pois: any[]; total: number }> {
+  const params = new URLSearchParams({
+    key,
+    location: `${center[0]},${center[1]}`,
+    radius: String(Math.round(radius)),
+    types: category,
+    offset: String(pageSize),
+    page: String(page),
+  });
+  const url = `https://restapi.amap.com/v3/place/around?${params}`;
+  console.log(`[REST] 请求: page=${page} cat=${category} center=${center[0].toFixed(5)},${center[1].toFixed(5)} r=${Math.round(radius)}`);
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  console.log(`[REST] 响应: status=${data.status} count=${data.count} infocode=${data.infocode} info=${data.info}`);
+
+  if (data.status !== '1') {
+    throw new Error(`${data.info || 'API错误'} [${data.infocode}]`);
+  }
+
+  const pois = (data.pois || []).map((p: any) => {
+    const [lng, lat] = (p.location || ',').split(',').map(Number);
+    return {
+      id: p.id || '',
+      name: p.name || '未知',
+      subcategory: p.type?.split(';')[0] || '',
+      address: p.address || '',
+      lng: lng || center[0],
+      lat: lat || center[1],
+      phone: p.tel || '',
+    };
+  });
+
+  return { pois, total: parseInt(data.count) || 0 };
 }
 
 function generateGridCells(bounds: [[number, number], [number, number]], gridSizeMeters: number): GridCell[] {

@@ -6,10 +6,9 @@ interface Props {
   drawnShape: DrawnShape | null;
   gridCells: GridCell[];
   splitGrid: (meters: number) => number;
-  onGridChange: (cells: GridCell[]) => void;
 }
 
-function StepGrid({ loaded, drawnShape, gridCells, splitGrid, onGridChange }: Props) {
+function StepGrid({ loaded, drawnShape, gridCells, splitGrid }: Props) {
   const [gridSize, setGridSize] = useState(500);
 
   const handleSplit = useCallback(() => {

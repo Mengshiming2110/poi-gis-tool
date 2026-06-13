@@ -4,6 +4,7 @@ import ControlPanel from './ControlPanel';
 import DrawToolbar from './DrawToolbar';
 import ProgressDrawer from './ProgressDrawer';
 import SettingsDialog from './SettingsDialog';
+import CloudPanel from './CloudPanel';
 import { useCollection } from '../hooks/useCollection';
 import { useSSE } from '../hooks/useSSE';
 import { getExportUrl } from '../services/api';
@@ -113,6 +114,7 @@ function DesktopApp() {
         )}
 
         <SettingsDialog />
+        <CloudPanel />
 
         <ProgressDrawer
           status={collection.status}
