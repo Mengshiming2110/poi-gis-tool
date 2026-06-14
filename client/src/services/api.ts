@@ -67,12 +67,14 @@ export async function queryPoiLibrary(params: {
   pageSize: number;
   search?: string;
   category?: string;
+  district?: string;
 }): Promise<PoiQueryResult> {
   const searchParams = new URLSearchParams();
   searchParams.set('page', String(params.page));
   searchParams.set('pageSize', String(params.pageSize));
   if (params.search) searchParams.set('search', params.search);
   if (params.category) searchParams.set('category', params.category);
+  if (params.district) searchParams.set('district', params.district);
 
   const res = await fetch(`${BASE}/pois/library?${searchParams}`);
   if (!res.ok) throw new Error('查询本地数据库失败');

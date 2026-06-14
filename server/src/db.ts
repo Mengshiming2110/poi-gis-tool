@@ -184,6 +184,7 @@ export function queryPoiLibrary(params: {
   pageSize: number;
   search?: string;
   category?: string;
+  district?: string;
 }): { pois: PoiRecord[]; total: number } {
   const conditions: string[] = [];
   const values: any[] = [];
@@ -194,6 +195,10 @@ export function queryPoiLibrary(params: {
   if (params.category) {
     conditions.push('category = ?');
     values.push(params.category);
+  }
+  if (params.district) {
+    conditions.push('COALESCE(NULLIF(district, \'\'), \'未知区县\') = ?');
+    values.push(params.district);
   }
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 

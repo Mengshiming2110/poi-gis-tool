@@ -139,6 +139,9 @@ function DesktopApp() {
   const [libraryTotal, setLibraryTotal] = useState(0);
   const [libraryStats, setLibraryStats] = useState<PoiLibraryStats | null>(null);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [districtDrill, setDistrictDrill] = useState<string | null>(null);
+  const [drillPois, setDrillPois] = useState<PoiRecord[]>([]);
+  const [loadingDrill, setLoadingDrill] = useState(false);
   const [lastLibrarySync, setLastLibrarySync] = useState<string | null>(localStorage.getItem('poi_last_cloud_sync'));
 
   const drawAPIRef = useRef<MapAPI | null>(null);
@@ -694,27 +697,73 @@ function DesktopApp() {
               <h3>按区域存储</h3>
               <button className="desktop-btn" onClick={loadPoiLibrary} disabled={loadingLibrary}>{loadingLibrary ? '刷新中...' : '刷新本地库'}</button>
             </div>
-            <p>采集数据写入本地数据库，按区县自动归类。</p>
-            <div className="area-store-list">
-              {dbStats && dbStats.byDistrict.length > 0 ? dbStats.byDistrict.map((d) => (
-                <div key={d.district} className="area-store-card">
-                  <div className="area-store-title">
-                    <strong>{d.district}</strong>
-                    <span>{d.count} 条</span>
-                  </div>
-                  <div className="area-store-scope">区县级采集区域</div>
-                  <div className="area-store-row">
-                    <span>占本地库</span>
-                    <b>{Math.round((d.count / Math.max(dbStats.total, 1)) * 100)}%</b>
-                  </div>
+            {districtDrill ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <strong style={{ fontSize: 14 }}>{districtDrill} · {drillPois.length} 条</strong>
+                  <button className="desktop-btn" style={{ padding: '3px 12px', fontSize: 11 }}
+                    onClick={() => { setDistrictDrill(null); setDrillPois([]); }}>← 返回区域列表</button>
                 </div>
-              )) : (
-                <div className="desktop-empty-state compact">
-                  <strong>本地数据库暂无数据</strong>
-                  <span>完成一次服务端采集后，数据会自动写入这里并按区县归类。</span>
+                <div style={{ maxHeight: 360, overflow: 'auto' }}>
+                  {loadingDrill ? (
+                    <div className="desktop-empty-state compact"><strong>加载中...</strong></div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                      <thead><tr style={{ borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--surface)' }}>
+                        {['名称', '类别', '地址', '电话', '坐标'].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '4px 6px', fontSize: 10, fontWeight: 600, color: 'var(--muted)' }}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {drillPois.map(p => (
+                          <tr key={p.id} style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                            onClick={() => { setSelectedPoi(p); setView('detail'); }}>
+                            <td style={{ padding: '4px 6px', fontWeight: 500 }}>{p.name}</td>
+                            <td style={{ padding: '4px 6px', color: 'var(--muted)' }}>{catName(p.category)}</td>
+                            <td style={{ padding: '4px 6px', color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address || '—'}</td>
+                            <td style={{ padding: '4px 6px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{p.phone || '—'}</td>
+                            <td style={{ padding: '4px 6px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{p.lng?.toFixed(4)},{p.lat?.toFixed(4)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <>
+                <p>采集数据写入本地数据库，按区县自动归类。点击区域查看详情。</p>
+                <div className="area-store-list">
+                  {dbStats && dbStats.byDistrict.length > 0 ? dbStats.byDistrict.map((d) => (
+                    <div key={d.district} className="area-store-card" style={{ cursor: 'pointer' }}
+                      onClick={async () => {
+                        setDistrictDrill(d.district);
+                        setLoadingDrill(true);
+                        try {
+                          const result = await queryPoiLibrary({ page: 1, pageSize: 200, district: d.district });
+                          setDrillPois(result.pois);
+                        } catch { showToast('加载区域数据失败', 'error'); }
+                        setLoadingDrill(false);
+                      }}>
+                      <div className="area-store-title">
+                        <strong>{d.district}</strong>
+                        <span>{d.count} 条</span>
+                      </div>
+                      <div className="area-store-scope">区县级采集区域</div>
+                      <div className="area-store-row">
+                        <span>占本地库</span>
+                        <b>{Math.round((d.count / Math.max(dbStats.total, 1)) * 100)}%</b>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="desktop-empty-state compact">
+                      <strong>本地数据库暂无数据</strong>
+                      <span>完成一次服务端采集后，数据会自动写入这里并按区县归类。</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </section>
 
           <section className="data-card data-card-tall">
