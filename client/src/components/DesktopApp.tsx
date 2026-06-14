@@ -57,36 +57,6 @@ function downloadBlob(content: string, filename: string, mime: string) {
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
-function ApiKeyField({ label, storageKey, placeholder }: { label: string; storageKey: string; placeholder: string }) {
-  const [value, setValue] = useState(localStorage.getItem(storageKey) || '');
-  const [saved, setSaved] = useState(false);
-
-  const handleSave = () => {
-    const v = value.trim();
-    if (v) localStorage.setItem(storageKey, v);
-    else localStorage.removeItem(storageKey);
-    localStorage.removeItem('amap_quota_block_day');
-    localStorage.removeItem('amap_quota_block_key');
-    localStorage.removeItem('amap_quota_block_message');
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</label>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <input className="input-field" type="password" value={value} onChange={e => setValue(e.target.value)}
-          placeholder={placeholder} style={{ flex: 1 }} />
-        <button className="desktop-btn primary" onClick={handleSave}
-          style={{ justifyContent: 'center', fontSize: 11, padding: '0 14px', whiteSpace: 'nowrap' }}>
-          {saved ? '✓ 已保存' : '保存'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function clientExport(pois: any[], format: 'csv' | 'geojson') {
   if (format === 'csv') {
     downloadBlob(buildCSV(pois), 'poi-data.csv', 'text/csv');
@@ -868,9 +838,33 @@ function DesktopApp() {
           }
           return null;
         })()}
-        <ApiKeyField label="API Key (Web服务)" storageKey="amap_rest_key" placeholder="输入高德 Web服务 Key" />
-        <ApiKeyField label="API Key (JS API)" storageKey="amap_js_key" placeholder="输入高德 JS API Key" />
-        <ApiKeyField label="安全密钥" storageKey="amap_security_code" placeholder="输入高德安全密钥（JS API用）" />
+        {(() => {
+          const [keys, setKeys] = useState({
+            rest: localStorage.getItem('amap_rest_key') || '',
+            js: localStorage.getItem('amap_js_key') || '',
+            sec: localStorage.getItem('amap_security_code') || '',
+          });
+          const [apiSaved, setApiSaved] = useState(false);
+          const labelStyle: React.CSSProperties = { fontSize: 10, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.04em' };
+          const inputStyle: React.CSSProperties = { padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 13, outline: 'none', flex: 1 };
+          return (
+            <>
+              <div style={{ marginBottom: 8 }}><label style={labelStyle}>API Key (Web服务)</label><input className="input-field" type="password" value={keys.rest} onChange={e => setKeys(p => ({ ...p, rest: e.target.value }))} placeholder="输入高德 Web服务 Key" /></div>
+              <div style={{ marginBottom: 8 }}><label style={labelStyle}>API Key (JS API)</label><input className="input-field" type="password" value={keys.js} onChange={e => setKeys(p => ({ ...p, js: e.target.value }))} placeholder="输入高德 JS API Key" /></div>
+              <div style={{ marginBottom: 8 }}><label style={labelStyle}>安全密钥</label><input className="input-field" type="password" value={keys.sec} onChange={e => setKeys(p => ({ ...p, sec: e.target.value }))} placeholder="输入高德安全密钥（JS API用）" /></div>
+              <button className="desktop-btn primary" style={{ justifyContent: 'center', width: '100%', padding: '7px 0', fontSize: 13, fontWeight: 600 }}
+                onClick={() => {
+                  if (keys.rest) localStorage.setItem('amap_rest_key', keys.rest.trim()); else localStorage.removeItem('amap_rest_key');
+                  if (keys.js) localStorage.setItem('amap_js_key', keys.js.trim()); else localStorage.removeItem('amap_js_key');
+                  if (keys.sec) localStorage.setItem('amap_security_code', keys.sec.trim()); else localStorage.removeItem('amap_security_code');
+                  localStorage.removeItem('amap_quota_block_day'); localStorage.removeItem('amap_quota_block_key'); localStorage.removeItem('amap_quota_block_message');
+                  setApiSaved(true); setTimeout(() => setApiSaved(false), 2000);
+                }}>
+                {apiSaved ? '✓ 已保存' : '保存 API 设置'}
+              </button>
+            </>
+          );
+        })()}
       </div>
       <div className="card" style={{ marginBottom: 14 }}>
         <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>⚙ 采集参数</h4>
