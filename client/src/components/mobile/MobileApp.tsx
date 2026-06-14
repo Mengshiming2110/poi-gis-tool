@@ -142,6 +142,7 @@ function MobileApp() {
                 <StepDraw
                   loaded={amap.loaded}
                   drawnShape={drawnShape}
+                  activeMode={amap.drawMode}
                   setDrawMode={amap.setDrawMode}
                   clearDrawings={amap.clearDrawings}
                   getDrawnShape={amap.getDrawnShape}
@@ -289,10 +290,10 @@ function MobileApp() {
                 </a>
               )}
               <div className="version-list">
-                <div><b>v{CURRENT_VERSION}</b><span>设置联动采集 + Key引导 + 软件内更新</span><em>06-14</em></div>
+                <div><b>v{CURRENT_VERSION}</b><span>POI地图标记+云端导入+调试模式</span><em>06-14</em></div>
+                <div><b>v2.3.0</b><span>设置联动采集 + Key引导 + 软件内更新</span><em>06-14</em></div>
                 <div><b>v2.2.0</b><span>检查更新 + 底部Tab导航</span><em>06-13</em></div>
                 <div><b>v2.1.0</b><span>按区域分组存储、重复检测优化</span><em>06-10</em></div>
-                <div><b>v2.0.0</b><span>重构采集引擎、Excel 导出</span><em>05-15</em></div>
               </div>
             </div>
           </div>

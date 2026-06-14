@@ -71,6 +71,13 @@ export async function initDb(): Promise<void> {
   `);
   db.run('CREATE INDEX IF NOT EXISTS idx_pois_task ON pois(task_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_pois_category ON pois(category)');
+
+  // Migrations: add address fields if missing
+  const poiColumns = db.exec('PRAGMA table_info(pois)')[0]?.values.map((row: any) => row[1]) || [];
+  if (!poiColumns.includes('province')) db.run('ALTER TABLE pois ADD COLUMN province TEXT');
+  if (!poiColumns.includes('city')) db.run('ALTER TABLE pois ADD COLUMN city TEXT');
+  if (!poiColumns.includes('district')) db.run('ALTER TABLE pois ADD COLUMN district TEXT');
+  if (!poiColumns.includes('town')) db.run('ALTER TABLE pois ADD COLUMN town TEXT');
   saveDb();
 }
 
@@ -115,10 +122,10 @@ export function incrementTaskProgress(id: string, newPois: number): void {
 
 // --- POI CRUD ---
 
-export function insertPois(taskId: string, pois: Omit<PoiRecord, 'id' | 'task_id' | 'collected_at'>[], skipDup: boolean = false): number {
+export function insertPois(taskId: string, pois: (Omit<PoiRecord, 'id' | 'task_id' | 'collected_at'> & { province?: string; city?: string; district?: string; town?: string })[], skipDup: boolean = false): number {
   db.run('BEGIN');
   const stmt = db.prepare(
-    'INSERT INTO pois (task_id, name, category, subcategory, address, lng, lat, phone, rating) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO pois (task_id, name, category, subcategory, address, lng, lat, phone, rating, province, city, district, town) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const dedupStmt = skipDup
     ? db.prepare('SELECT COUNT(*) as c FROM pois WHERE name = ? AND ABS(lng - ?) < 0.0005 AND ABS(lat - ?) < 0.0005')
@@ -132,7 +139,8 @@ export function insertPois(taskId: string, pois: Omit<PoiRecord, 'id' | 'task_id
       dedupStmt.reset();
       if (c > 0) continue; // skip duplicate
     }
-    stmt.bind([taskId, item.name, item.category, item.subcategory, item.address, item.lng, item.lat, item.phone, item.rating]);
+    stmt.bind([taskId, item.name, item.category, item.subcategory, item.address, item.lng, item.lat, item.phone, item.rating,
+      item.province || null, item.city || null, item.district || null, item.town || null]);
     stmt.step();
     stmt.reset();
     inserted++;
@@ -165,6 +173,38 @@ export function queryPois(params: {
 
   const pois: PoiRecord[] = [];
   const stmt = db.prepare(`SELECT * FROM pois WHERE ${where} ORDER BY id LIMIT ? OFFSET ?`);
+  stmt.bind([...values, params.pageSize, (params.page - 1) * params.pageSize]);
+  while (stmt.step()) { pois.push(rowToObj(stmt) as PoiRecord); }
+  stmt.free();
+  return { pois, total };
+}
+
+export function queryPoiLibrary(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  category?: string;
+}): { pois: PoiRecord[]; total: number } {
+  const conditions: string[] = [];
+  const values: any[] = [];
+  if (params.search) {
+    conditions.push('(name LIKE ? OR address LIKE ?)');
+    values.push(`%${params.search}%`, `%${params.search}%`);
+  }
+  if (params.category) {
+    conditions.push('category = ?');
+    values.push(params.category);
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countStmt = db.prepare(`SELECT COUNT(*) as count FROM pois ${where}`);
+  countStmt.bind(values);
+  countStmt.step();
+  const total = countStmt.getAsObject().count as number;
+  countStmt.free();
+
+  const pois: PoiRecord[] = [];
+  const stmt = db.prepare(`SELECT * FROM pois ${where} ORDER BY collected_at DESC, id DESC LIMIT ? OFFSET ?`);
   stmt.bind([...values, params.pageSize, (params.page - 1) * params.pageSize]);
   while (stmt.step()) { pois.push(rowToObj(stmt) as PoiRecord); }
   stmt.free();

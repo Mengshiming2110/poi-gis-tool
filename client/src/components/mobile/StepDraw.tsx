@@ -1,36 +1,36 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import type { DrawMode, DrawnShape } from '../../hooks/useAmap';
 
 const DRAW_TOOLS: Array<{ mode: Exclude<DrawMode, null>; label: string; hint: string; icon: string }> = [
   { mode: 'polygon', label: '自由区域', hint: '点按地图添加边界点，完成后自动生成区域', icon: '⬠' },
   { mode: 'rectangle', label: '矩形范围', hint: '点一次设起点，再点一次完成矩形', icon: '▭' },
   { mode: 'circle', label: '圆形范围', hint: '点一次设中心，再点一次设半径', icon: '◯' },
+  { mode: 'marker', label: '标注点', hint: '点按地图添加一个人工标注点，添加后自动退出', icon: '•' },
 ];
 
 interface Props {
   loaded: boolean;
   drawnShape: DrawnShape | null;
+  activeMode: DrawMode;
   setDrawMode: (mode: DrawMode) => void;
   clearDrawings: () => void;
   getDrawnShape: () => DrawnShape | null;
   onShapeChange: (shape: DrawnShape | null) => void;
 }
 
-function StepDraw({ loaded, drawnShape, setDrawMode: applyMode, clearDrawings, getDrawnShape, onShapeChange }: Props) {
-  const [drawMode, setDrawMode] = useState<DrawMode>(null);
+function StepDraw({ loaded, drawnShape, activeMode, setDrawMode: applyMode, clearDrawings, getDrawnShape, onShapeChange }: Props) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const drawMode = activeMode;
 
   const selectMode = useCallback(
     (mode: DrawMode) => {
       if (drawMode === mode) {
-        setDrawMode(null);
         applyMode(null);
       } else {
-        setDrawMode(mode);
         applyMode(mode);
       }
     },
-    [drawMode, applyMode],
+    [activeMode, applyMode],
   );
 
   // Poll for drawn shape
@@ -44,10 +44,6 @@ function StepDraw({ loaded, drawnShape, setDrawMode: applyMode, clearDrawings, g
     }, 500);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [loaded, drawnShape, getDrawnShape, onShapeChange]);
-
-  useEffect(() => {
-    if (drawnShape) setDrawMode(null);
-  }, [drawnShape]);
 
   return (
     <div className="mobile-panel-block">
@@ -84,8 +80,8 @@ function StepDraw({ loaded, drawnShape, setDrawMode: applyMode, clearDrawings, g
       </div>
 
       <button className="mobile-text-action"
-        onClick={() => { clearDrawings(); onShapeChange(null); }} disabled={!loaded || !drawnShape}>
-        清除当前区域
+        onClick={() => { clearDrawings(); onShapeChange(null); }} disabled={!loaded}>
+        清除区域与标注
       </button>
     </div>
   );

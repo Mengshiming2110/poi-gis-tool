@@ -9,6 +9,7 @@ interface MapViewProps {
   onMapReady?: (api: MapAPI) => void;
   onShapeChange?: (shape: DrawnShape | null) => void;
   onGridChange?: (cells: GridCell[]) => void;
+  onDrawModeChange?: (mode: DrawMode) => void;
 }
 
 export interface MapAPI {
@@ -29,7 +30,7 @@ export interface MapAPI {
   isCollecting: boolean;
 }
 
-function MapView({ children, onMapReady, onShapeChange, onGridChange }: MapViewProps) {
+function MapView({ children, onMapReady, onShapeChange, onGridChange, onDrawModeChange }: MapViewProps) {
   const amap = useAmap('map-container');
   const readyRef = useRef(false);
 
@@ -66,6 +67,10 @@ function MapView({ children, onMapReady, onShapeChange, onGridChange }: MapViewP
   useEffect(() => {
     if (onGridChange) onGridChange(amap.gridCells);
   }, [amap.gridCells, onGridChange]);
+
+  useEffect(() => {
+    if (onDrawModeChange) onDrawModeChange(amap.drawMode);
+  }, [amap.drawMode, onDrawModeChange]);
 
   return (
     <>

@@ -62,6 +62,23 @@ export async function queryPois(params: {
   return res.json();
 }
 
+export async function queryPoiLibrary(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  category?: string;
+}): Promise<PoiQueryResult> {
+  const searchParams = new URLSearchParams();
+  searchParams.set('page', String(params.page));
+  searchParams.set('pageSize', String(params.pageSize));
+  if (params.search) searchParams.set('search', params.search);
+  if (params.category) searchParams.set('category', params.category);
+
+  const res = await fetch(`${BASE}/pois/library?${searchParams}`);
+  if (!res.ok) throw new Error('查询本地数据库失败');
+  return res.json();
+}
+
 export function getExportUrl(taskId: string, format: 'xlsx' | 'geojson'): string {
   return `${BASE}/export/${taskId}?format=${format}`;
 }

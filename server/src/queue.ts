@@ -7,6 +7,15 @@ import { config } from './config';
 import { mockAmapResponse } from './services/mock-pois';
 import type { CollectRequest, GridCell, AmapPoiItem, TaskStatus } from './types';
 
+function parseAddress(address: string): { province: string; city: string; district: string; town: string } {
+  const text = address || '';
+  const province = text.match(/([^省]+省|[^市]+市|[^区]+自治区)/)?.[0] || '';
+  const city = text.match(/([^省市]+市|[^州]+州|[^盟]+盟)/)?.[0] || '';
+  const district = text.match(/([^市区县]+区|[^市区县]+县|[^市区县]+市)/)?.[0] || '';
+  const town = text.match(/([^区县镇乡街道]+镇|[^区县镇乡街道]+乡|[^区县镇乡街道]+街道)/)?.[0] || '';
+  return { province, city, district, town };
+}
+
 interface ActiveTask {
   id: string;
   cells: GridCell[];
@@ -149,17 +158,10 @@ async function processNextCell(taskId: string): Promise<void> {
   console.log(`[Queue] 格子 ${task.currentIndex + 1} 返回 ${pois.length} 条POI`);
 
   if (pois.length > 0) {
-    // Cloud sync
-    cloudInsertPois(taskId, pois.map(p => ({
-      name: p.name, category: CATEGORY_MAP[(p.typecode || '').split('|')[1]?.slice(0, 6)] || '',
-      subcategory: (p.type || '').split(';')[1] || '', address: p.address || '',
-      lng: parseFloat(p.location.split(',')[0]), lat: parseFloat(p.location.split(',')[1]),
-      phone: p.tel || '', rating: p.biz_ext?.rating ? parseFloat(p.biz_ext.rating) : null,
-    }))).catch(() => {});
-
-    insertPois(taskId, pois.map(p => {
+    const mappedPois = pois.map(p => {
       const parts = (p.typecode || '').split('|');
       const code = parts.length > 1 ? parts[1].slice(0, 6) : '';
+      const addrParsed = parseAddress(p.address || '');
       return {
         name: p.name,
         category: CATEGORY_MAP[code] || code,
@@ -169,8 +171,15 @@ async function processNextCell(taskId: string): Promise<void> {
         lat: parseFloat(p.location.split(',')[1]),
         phone: p.tel || '',
         rating: p.biz_ext?.rating ? parseFloat(p.biz_ext.rating) : null,
+        ...addrParsed,
       };
-    }), task.skipDuplicates);
+    });
+
+    // Cloud sync
+    cloudInsertPois(taskId, mappedPois).catch(() => {});
+
+    // Local SQLite
+    insertPois(taskId, mappedPois, task.skipDuplicates);
   }
 
   incrementTaskProgress(taskId, pois.length);

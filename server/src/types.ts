@@ -49,6 +49,10 @@ export interface PoiRecord {
   lat: number;
   phone: string | null;
   rating: number | null;
+  province?: string | null;
+  city?: string | null;
+  district?: string | null;
+  town?: string | null;
   collected_at: string;
 }
 

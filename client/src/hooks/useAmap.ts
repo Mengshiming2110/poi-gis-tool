@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-export type DrawMode = 'polygon' | 'rectangle' | 'circle' | null;
+export type DrawMode = 'polygon' | 'rectangle' | 'circle' | 'marker' | null;
 
 export interface DrawnShape {
   type: 'polygon' | 'rectangle' | 'circle';
@@ -40,6 +40,8 @@ export function useAmap(containerId: string) {
   const mouseToolRef = useRef<any>(null);
   const placeSearchRef = useRef<any>(null);
   const drawnShapeRef = useRef<DrawnShape | null>(null);
+  const regionLabelRef = useRef<any>(null);
+  const annotationMarkersRef = useRef<any[]>([]);
   const gridOverlaysRef = useRef<any[]>([]);
   const poiMarkersRef = useRef<any[]>([]);
   const [map, setMap] = useState<any>(null);
@@ -100,6 +102,80 @@ export function useAmap(containerId: string) {
     cd.keyDownHandler = null;
   }, []);
 
+  const removeRegionLabel = useCallback(() => {
+    const inst = mapRef.current;
+    if (regionLabelRef.current && inst) {
+      try { inst.remove(regionLabelRef.current); } catch (e) {}
+    }
+    regionLabelRef.current = null;
+  }, []);
+
+  const getRegionLabelPosition = useCallback((shape: DrawnShape): [number, number] => {
+    if (shape.type === 'rectangle') {
+      const [[swLng], [neLng, neLat]] = shape.geometry.bounds;
+      return [(swLng + neLng) / 2, neLat];
+    }
+    if (shape.type === 'circle') {
+      const [lng, lat] = shape.geometry.center;
+      return [lng, lat + shape.geometry.radius / 111320];
+    }
+    const lngs = shape.geometry.map((p: number[]) => p[0]);
+    const lats = shape.geometry.map((p: number[]) => p[1]);
+    return [(Math.min(...lngs) + Math.max(...lngs)) / 2, Math.max(...lats)];
+  }, []);
+
+  const showRegionLabel = useCallback((shape: DrawnShape) => {
+    const inst = mapRef.current;
+    const AMap = window.AMap;
+    if (!inst || !AMap) return;
+    removeRegionLabel();
+    const [lng, lat] = getRegionLabelPosition(shape);
+    const label = new AMap.Marker({
+      position: new AMap.LngLat(lng, lat),
+      anchor: 'bottom-center',
+      offset: new AMap.Pixel(0, -8),
+      zIndex: 180,
+      content: `<div style="
+        padding:3px 10px;
+        border:1px solid #3b82f6;
+        border-radius:4px;
+        background:rgba(255,255,255,0.96);
+        color:#2563eb;
+        font-size:12px;
+        font-weight:800;
+        line-height:1.35;
+        white-space:nowrap;
+        box-shadow:0 2px 8px rgba(37,99,235,0.14);
+      ">采集区域 A — 当前圈选</div>`,
+    });
+    label.setMap(inst);
+    regionLabelRef.current = label;
+  }, [getRegionLabelPosition, removeRegionLabel]);
+
+  const addAnnotationMarker = useCallback((point: [number, number]) => {
+    const inst = mapRef.current;
+    const AMap = window.AMap;
+    if (!inst || !AMap) return;
+    const marker = new AMap.Marker({
+      position: new AMap.LngLat(point[0], point[1]),
+      anchor: 'bottom-center',
+      offset: new AMap.Pixel(0, 0),
+      zIndex: 160,
+      content: `<div title="人工标注点" style="
+        width:30px;height:38px;
+        transform:translateY(2px);
+        filter:drop-shadow(0 4px 8px rgba(37,99,235,0.28));
+      ">
+        <svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 0C7.27 0 1 6.2 1 13.85C1 24.23 15 38 15 38S29 24.23 29 13.85C29 6.2 22.73 0 15 0Z" fill="#3478e5"/>
+          <circle cx="15" cy="14" r="4.5" fill="white"/>
+        </svg>
+      </div>`,
+    });
+    marker.setMap(inst);
+    annotationMarkersRef.current.push(marker);
+  }, []);
+
   // Poll until window.AMap is available, then init
   useEffect(() => {
     let destroyed = false;
@@ -148,12 +224,14 @@ export function useAmap(containerId: string) {
             if (drawnShapeRef.current?.overlay) {
               try { instance.remove(drawnShapeRef.current.overlay); } catch (e) {}
             }
+            removeRegionLabel();
             // Clear old grids
             gridOverlaysRef.current.forEach(o => { try { instance.remove(o); } catch (e) {} });
             gridOverlaysRef.current = [];
 
             drawnShapeRef.current = shapeInfo;
             setDrawnShape(shapeInfo);
+            showRegionLabel(shapeInfo);
             setGridCells([]);
           }
           mouseTool.close(false);
@@ -199,7 +277,7 @@ export function useAmap(containerId: string) {
         mapRef.current = null;
       }
     };
-  }, [containerId]);
+  }, [containerId, removeRegionLabel, showRegionLabel]);
 
   // Draw mode switching via useEffect (like reference)
   const setDrawMode = useCallback((mode: DrawMode) => {
@@ -233,6 +311,30 @@ export function useAmap(containerId: string) {
         strokeColor: '#4A90D9', fillColor: '#4A90D9',
         strokeWeight: 3, strokeOpacity: 0.8, fillOpacity: 0.15, strokeStyle: 'dashed',
       });
+      return;
+    }
+
+    if (drawMode === 'marker') {
+      const onClick = (e: any) => {
+        addAnnotationMarker([e.lnglat.lng, e.lnglat.lat]);
+        cleanupCustomDraw();
+        mapInstance.setStatus({ dragEnable: true });
+        if (mapEl) mapEl.style.cursor = '';
+        setDrawModeState(null);
+      };
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          cleanupCustomDraw();
+          mapInstance.setStatus({ dragEnable: true });
+          if (mapEl) mapEl.style.cursor = '';
+          setDrawModeState(null);
+        }
+      };
+      const cd = customDrawRef.current;
+      cd.clickHandler = onClick;
+      cd.keyDownHandler = onKeyDown;
+      mapInstance.on('click', onClick);
+      document.addEventListener('keydown', onKeyDown);
       return;
     }
 
@@ -338,10 +440,12 @@ export function useAmap(containerId: string) {
       if (drawnShapeRef.current?.overlay) {
         try { mapInstance.remove(drawnShapeRef.current.overlay); } catch (e) {}
       }
+      removeRegionLabel();
       gridOverlaysRef.current.forEach(o => { try { mapInstance.remove(o); } catch (e) {} });
       gridOverlaysRef.current = [];
       drawnShapeRef.current = shapeInfo;
       setDrawnShape(shapeInfo);
+      showRegionLabel(shapeInfo);
       setGridCells([]);
 
       // Exit draw mode
@@ -365,7 +469,7 @@ export function useAmap(containerId: string) {
     cd.keyDownHandler = onKeyDown;
     mapInstance.on('click', onClick);
     document.addEventListener('keydown', onKeyDown);
-  }, [drawMode, cleanupCustomDraw]);
+  }, [drawMode, cleanupCustomDraw, addAnnotationMarker, removeRegionLabel, showRegionLabel]);
 
   const getBounds = useCallback(() => {
     if (!mapRef.current) return null;
@@ -382,6 +486,9 @@ export function useAmap(containerId: string) {
     if (drawnShapeRef.current?.overlay && mapRef.current) {
       try { mapRef.current.remove(drawnShapeRef.current.overlay); } catch (e) {}
     }
+    removeRegionLabel();
+    annotationMarkersRef.current.forEach(o => { try { mapRef.current?.remove(o); } catch (e) {} });
+    annotationMarkersRef.current = [];
     gridOverlaysRef.current.forEach(o => { try { mapRef.current?.remove(o); } catch (e) {} });
     gridOverlaysRef.current = [];
     drawnShapeRef.current = null;
@@ -389,7 +496,7 @@ export function useAmap(containerId: string) {
     setGridCells([]);
     setDrawModeState(null);
     mapRef.current?.setStatus({ dragEnable: true });
-  }, [cleanupCustomDraw]);
+  }, [cleanupCustomDraw, removeRegionLabel]);
 
   const getDrawnShape = useCallback((): DrawnShape | null => {
     return drawnShapeRef.current;
@@ -635,19 +742,39 @@ export function useAmap(containerId: string) {
       "></div>`;
 
       const infoHtml = `<div style="
-        background:#fff;padding:10px 14px;border-radius:8px;
-        font-size:12px;min-width:180px;
-        box-shadow:0 4px 16px rgba(0,0,0,0.15);
-        border:1px solid #e2e8f0;line-height:1.6;
+        width:260px;
+        background:#fff;
+        border:1px solid #e2e8f0;
+        border-radius:10px;
+        padding:14px;
+        box-shadow:0 14px 36px rgba(15,23,42,0.18);
+        color:#0f172a;
+        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
       ">
-        <div style="font-weight:600;font-size:14px;margin-bottom:2px;color:#1e293b">${p.name}</div>
-        <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
-          <span style="width:8px;height:8px;border-radius:2px;background:${p.color};display:inline-block"></span>
-          <span style="color:#64748b">${p.category}</span>
+        <div style="
+          display:inline-flex;align-items:center;gap:6px;
+          padding:2px 9px;border-radius:999px;
+          background:#eff6ff;color:#2563eb;
+          font-size:11px;font-weight:800;margin-bottom:10px;
+        ">
+          <span style="width:7px;height:7px;border-radius:50%;background:${p.color};display:inline-block"></span>${p.category}
         </div>
-        ${p.address ? `<div style="color:#94a3b8;font-size:11px">📍 ${p.address}</div>` : ''}
-        ${p.phone ? `<div style="color:#94a3b8;font-size:11px">📞 ${p.phone}</div>` : ''}
-        <div style="color:#94a3b8;font-size:10px;font-family:monospace;margin-top:2px">${p.lng.toFixed(5)}, ${p.lat.toFixed(5)}</div>
+        <div style="font-weight:900;font-size:17px;line-height:1.25;margin-bottom:8px;">${p.name}</div>
+        <div style="font-size:12px;line-height:1.55;color:#64748b;margin-bottom:10px;">${p.address || '地址未知'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+          <div>
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:2px;">电话</div>
+            <div style="font-size:12px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.phone || '—'}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:2px;">坐标</div>
+            <div style="font-size:12px;color:#0f172a;font-family:ui-monospace,monospace;">${p.lng.toFixed(3)}, ${p.lat.toFixed(3)}</div>
+          </div>
+        </div>
+        <div style="height:54px;border:1px solid #e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:12px;background-image:linear-gradient(#e2e8f0 1px,transparent 1px),linear-gradient(90deg,#e2e8f0 1px,transparent 1px);background-size:18px 18px;background-color:#f8fafc;">
+          地图缩略图
+        </div>
+        ${p.phone ? `<a href="tel:${p.phone}" style="display:block;margin-top:10px;height:32px;line-height:32px;text-align:center;border-radius:6px;background:#3478e5;color:white;text-decoration:none;font-size:13px;font-weight:800;">拨打电话</a>` : ''}
       </div>`;
 
       const marker = new window.AMap.Marker({

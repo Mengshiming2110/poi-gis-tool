@@ -1,7 +1,20 @@
 import { Router, Request, Response } from 'express';
-import { queryPois } from '../db';
+import { queryPoiLibrary, queryPois } from '../db';
 
 const router = Router();
+
+router.get('/library', (req: Request, res: Response) => {
+  const { page = '1', pageSize = '200', search, category } = req.query;
+
+  const result = queryPoiLibrary({
+    page: parseInt(String(page), 10),
+    pageSize: Math.min(parseInt(String(pageSize), 10), 500),
+    search: search ? String(search) : undefined,
+    category: category ? String(category) : undefined,
+  });
+
+  res.json(result);
+});
 
 router.get('/', (req: Request, res: Response) => {
   const { taskId, page = '1', pageSize = '50', search, category } = req.query;
