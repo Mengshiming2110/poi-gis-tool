@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { Cloud, ArrowsClockwise, DownloadSimple, ChartBar, Key, Gear, Wrench, Warning, ClipboardText, Check, CheckCircle, X, Play, Pause, Stop, MapPin, Phone, Moon, Sun, Hourglass, MapTrifold, Polygon, Square, Circle, PushPin } from '@phosphor-icons/react';
 import MapView from './MapView';
 import UpdatePrompt from './UpdatePrompt';
 import { useCollection } from '../hooks/useCollection';
@@ -319,10 +320,10 @@ function DesktopApp() {
             <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: 6 }}>绘制工具</div>
             <div style={{ display: 'flex', gap: 3 }}>
               {([
-                { id: 'rectangle' as const, label: '□ 矩形' },
-                { id: 'polygon' as const, label: '⬠ 多边形' },
-                { id: 'circle' as const, label: '○ 圆形' },
-                { id: 'marker' as const, label: '• 标注点' },
+                { id: 'rectangle' as const, label: '矩形', Icon: Square },
+                { id: 'polygon' as const, label: '多边形', Icon: Polygon },
+                { id: 'circle' as const, label: '圆形', Icon: Circle },
+                { id: 'marker' as const, label: '标注点', Icon: PushPin },
               ]).map(m => (
                 <button key={m.id}
                   className="desktop-btn"
@@ -336,11 +337,11 @@ function DesktopApp() {
                     if (drawMode === m.id) { setDrawMode(null); drawAPIRef.current?.setDrawMode(null); }
                     else { setDrawMode(m.id); drawAPIRef.current?.setDrawMode(m.id); }
                   }}
-                >{m.label}</button>
+                ><m.Icon size={12} />{m.label}</button>
               ))}
               <button className="desktop-btn" style={{
                 justifyContent: 'center', fontSize: 11, color: 'var(--warn)',
-              }} onClick={() => { drawAPIRef.current?.clearDrawings(); setDrawMode(null); setDrawnShape(null); setGridCells([]); }}>✕</button>
+              }} onClick={() => { drawAPIRef.current?.clearDrawings(); setDrawMode(null); setDrawnShape(null); setGridCells([]); }}><X size={12} /></button>
             </div>
             {drawMode && (
               <div style={{ marginTop: 6, fontSize: 11, color: 'var(--accent)', background: 'var(--accent-dim)', padding: '5px 8px', borderRadius: 4 }}>
@@ -356,7 +357,7 @@ function DesktopApp() {
             )}
             {drawnShape && (
               <div style={{ marginTop: 6, fontSize: 11, color: 'var(--success)' }}>
-                ✓ 已绘制 {drawnShape.type === 'circle' ? `圆形 (r${Math.round(drawnShape.geometry.radius)}m)` : drawnShape.type}
+                <Check size={12} weight="bold" style={{verticalAlign:-2}} /> 已绘制 {drawnShape.type === 'circle' ? `圆形 (r${Math.round(drawnShape.geometry.radius)}m)` : drawnShape.type}
               </div>
             )}
           </div>
@@ -400,7 +401,7 @@ function DesktopApp() {
             </div>
             <button onClick={handleStart} disabled={disabled}
               className="desktop-btn primary" style={{ width: '100%', justifyContent: 'center', padding: '8px 0', fontSize: 13, fontWeight: 600 }}>
-              ▶ 开始采集
+              <Play size={14} weight="fill" /> 开始采集
             </button>
           </div>
         </div>
@@ -496,9 +497,9 @@ function DesktopApp() {
 
         {(collection.status === 'running' || collection.status === 'paused') && (
           <div className="progress-actions">
-            {collection.status === 'running' && <button className="desktop-btn" onClick={() => { collection.pause(); showToast('已暂停', 'info'); }}>暂停采集</button>}
-            {collection.status === 'paused' && <button className="desktop-btn primary" onClick={() => { collection.resume(); showToast('已恢复', 'info'); }}>继续采集</button>}
-            <button className="desktop-btn danger" onClick={() => { collection.cancel(); showToast('已取消', 'info'); }}>取消采集</button>
+            {collection.status === 'running' && <button className="desktop-btn" onClick={() => { collection.pause(); showToast('已暂停', 'info'); }}><Pause size={13} weight="fill" style={{verticalAlign:-2}} /> 暂停采集</button>}
+            {collection.status === 'paused' && <button className="desktop-btn primary" onClick={() => { collection.resume(); showToast('已恢复', 'info'); }}><Play size={13} weight="fill" style={{verticalAlign:-2}} /> 继续采集</button>}
+            <button className="desktop-btn danger" onClick={() => { collection.cancel(); showToast('已取消', 'info'); }}><Stop size={13} weight="fill" style={{verticalAlign:-2}} /> 取消采集</button>
           </div>
         )}
 
@@ -681,12 +682,12 @@ function DesktopApp() {
           {/* Left: Actions */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <section className="data-card">
-              <h3>☁ 云同步</h3>
+              <h3><Cloud size={16} style={{marginRight:4,verticalAlign:-3}} /> 云同步</h3>
               <div style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                   <button className="desktop-btn primary" style={{ flex: 1, justifyContent: 'center' }}
                     onClick={() => handleUpload(sourcePois)} disabled={sourcePois.length === 0 || syncStatus === 'syncing'}>
-                    {syncStatus === 'syncing' ? '↑ 上传中...' : `↑ 上传全部 (${sourceTotal}条)`}
+                    {syncStatus === 'syncing' ? '上传中...' : `上传全部 (${sourceTotal}条)`}
                   </button>
                   <button className="desktop-btn" style={{ flex: 1, justifyContent: 'center' }}
                     onClick={() => handleUpload(incrementalPois)} disabled={incrementalPois.length === 0 || syncStatus === 'syncing'}>
@@ -694,7 +695,7 @@ function DesktopApp() {
                   </button>
                 </div>
                 <div className="data-meta-line" style={{ fontSize: 11 }}>
-                  上次同步：{lastSyncText}{syncStatus === 'done' ? ' ✅' : ''}
+                  上次同步：{lastSyncText}{syncStatus === 'done' ? <><CheckCircle size={12} color="var(--success)" style={{verticalAlign:-2,marginLeft:4}} /></> : ''}
                 </div>
               </div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
@@ -706,7 +707,7 @@ function DesktopApp() {
                       try { setCloudTasks(await getTasks()); } catch { showToast('获取云端任务失败', 'error'); }
                       setLoadingCloud(false);
                     }}>
-                    {loadingCloud ? '...' : '🔄 刷新'}
+                    {loadingCloud ? '...' : <><ArrowsClockwise size={12} /> 刷新</>}
                   </button>
                 </div>
                 {cloudTasks.length === 0 ? (
@@ -732,7 +733,7 @@ function DesktopApp() {
                             loadPoiLibrary();
                           } catch (e: any) { showToast('失败: ' + (e?.message || ''), 'error'); }
                         }}>
-                        ↓ 同步
+                        <DownloadSimple size={12} /> 同步
                       </button>
                     </div>
                   ))
@@ -741,7 +742,7 @@ function DesktopApp() {
             </section>
 
             <section className="data-card">
-              <h3>📥 数据导出</h3>
+              <h3><DownloadSimple size={15} style={{verticalAlign:-3,marginRight:4}} /> 数据导出</h3>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button className="desktop-btn primary" style={{ flex: 1, justifyContent: 'center' }}
                   disabled={!collection.taskId && sourcePois.length === 0}
@@ -760,7 +761,7 @@ function DesktopApp() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <section className="data-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <h3>📊 按区域存储</h3>
+                <h3><ChartBar size={15} style={{verticalAlign:-3,marginRight:4}} /> 按区域存储</h3>
                 <button className="desktop-btn" onClick={loadPoiLibrary} disabled={loadingLibrary} style={{ padding: '2px 10px', fontSize: 10 }}>
                   {loadingLibrary ? '...' : '刷新'}
                 </button>
@@ -822,7 +823,7 @@ function DesktopApp() {
             </section>
 
             <section className="data-card">
-              <h3>🔄 重复检测</h3>
+              <h3><ArrowsClockwise size={15} style={{verticalAlign:-3,marginRight:4}} /> 重复检测</h3>
               <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>
                 本地库 <b>{dbStats?.total || sourceTotal}</b> 条 · 同名同地址重复 <b style={{ color: 'var(--warn)' }}>{dbStats?.duplicateCount || 0}</b> 条
               </p>
@@ -831,7 +832,7 @@ function DesktopApp() {
                   可在商户详情页逐条处理重复项。
                 </div>
               ) : (
-                <p style={{ fontSize: 12, color: 'var(--muted)' }}>✓ 暂未检测到重复</p>
+                <p style={{ fontSize: 12, color: 'var(--muted)' }}><Check size={12} style={{verticalAlign:-2}} /> 暂未检测到重复</p>
               )}
             </section>
           </div>
@@ -843,14 +844,14 @@ function DesktopApp() {
   const renderSettingsView = () => (
     <div style={{ padding: 20, maxWidth: 680, margin: '0 auto', width: '100%', overflow: 'auto' }}>
       <div className="card" style={{ marginBottom: 14 }}>
-        <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>🔑 高德开放平台 API</h4>
+        <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}><Key size={15} style={{verticalAlign:-3,marginRight:4}} /> 高德开放平台 API</h4>
         {(() => {
           const blockedDay = localStorage.getItem('amap_quota_block_day');
           const today = new Date().toISOString().slice(0, 10);
           if (blockedDay === today) {
             return (
               <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 6, background: '#fff7ed', border: '1px solid #fed7aa', fontSize: 12, color: 'var(--warn)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>⚠ 今日配额已用完</span>
+                <span><Warning size={14} style={{verticalAlign:-2,marginRight:4}} color="var(--warn)" />今日配额已用完</span>
                 <button onClick={() => { localStorage.removeItem('amap_quota_block_day'); localStorage.removeItem('amap_quota_block_key'); localStorage.removeItem('amap_quota_block_message'); }}
                   style={{ padding: '3px 10px', borderRadius: 4, border: '1px solid #fed7aa', background: '#fff', color: 'var(--warn)', fontSize: 11, cursor: 'pointer' }}>清除</button>
               </div>
@@ -880,14 +881,14 @@ function DesktopApp() {
                   localStorage.removeItem('amap_quota_block_day'); localStorage.removeItem('amap_quota_block_key'); localStorage.removeItem('amap_quota_block_message');
                   setApiSaved(true); setTimeout(() => setApiSaved(false), 2000);
                 }}>
-                {apiSaved ? '✓ 已保存' : '保存 API 设置'}
+                {apiSaved ? <><Check size={14} weight="bold" style={{verticalAlign:-2}} /> 已保存</> : '保存 API 设置'}
               </button>
             </>
           );
         })()}
       </div>
       <div className="card" style={{ marginBottom: 14 }}>
-        <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>⚙ 采集参数</h4>
+        <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}><Gear size={15} style={{verticalAlign:-3,marginRight:4}} /> 采集参数</h4>
         <div style={{ marginBottom: 10 }}>
           <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             搜索半径 · {localStorage.getItem('amap_search_radius') || '1000'}m
@@ -919,13 +920,13 @@ function DesktopApp() {
             onClick={e => { const t = e.currentTarget; t.classList.toggle('on'); localStorage.setItem('amap_auto_upload', t.classList.contains('on') ? 'true' : 'false'); }} />
         </div>
         <div className="desktop-set-row">
-          <span>🔧 调试模式（模拟POI数据）</span>
+          <span><Wrench size={13} style={{verticalAlign:-2,marginRight:4}} />调试模式（模拟POI数据）</span>
           <div className={`desktop-toggle ${localStorage.getItem('amap_debug_mode') === 'true' ? 'on' : ''}`}
             onClick={e => { const t = e.currentTarget; t.classList.toggle('on'); localStorage.setItem('amap_debug_mode', t.classList.contains('on') ? 'true' : 'false'); }} />
         </div>
       </div>
       <div className="card">
-        <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>📋 版本管理</h4>
+        <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}><ClipboardText size={15} style={{verticalAlign:-3,marginRight:4}} /> 版本管理</h4>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', fontFamily: 'var(--font-mono)' }}>v{CURRENT_VERSION}</span>
           <span style={{ fontSize: 11, color: checkingUpdate ? 'var(--muted)' : updateInfo?.error ? 'var(--warn)' : updateInfo?.available ? 'var(--accent)' : 'var(--muted)' }}>
@@ -941,7 +942,7 @@ function DesktopApp() {
             else if (info.error) showToast('连接失败，请手动下载', 'error');
             else showToast('已是最新版本', 'info');
             setCheckingUpdate(false);
-          }}>{checkingUpdate ? '⏳ 检查中...' : '🔄 检查更新'}</button>
+          }}>{checkingUpdate ? <><Hourglass size={14} style={{verticalAlign:-2}} /> 检查中...</> : <><ArrowsClockwise size={14} style={{verticalAlign:-2}} /> 检查更新</>}</button>
         {updateInfo?.error && (
           <a href={updateInfo.url} target="_blank" rel="noopener noreferrer"
             style={{ display: 'block', marginTop: 8, textAlign: 'center', fontSize: 12, color: 'var(--accent)' }}>
@@ -982,7 +983,7 @@ function DesktopApp() {
         ))}
         <div className="desktop-sidebar-footer">
           <button className="desktop-nav-item" onClick={() => setDark(!dark)}>
-            {dark ? '☀️ 亮色模式' : '🌙 暗色模式'}
+            {dark ? <><Sun size={14} style={{verticalAlign:-2,marginRight:6}} />亮色模式</> : <><Moon size={14} style={{verticalAlign:-2,marginRight:6}} />暗色模式</>}
           </button>
         </div>
       </nav>
