@@ -144,7 +144,6 @@ function DesktopApp() {
   const [loadingDrill, setLoadingDrill] = useState(false);
   const [cloudTasks, setCloudTasks] = useState<CloudTask[]>([]);
   const [loadingCloud, setLoadingCloud] = useState(false);
-  const [cloudMergeResult, setCloudMergeResult] = useState<{ inserted: number; skipped: number } | null>(null);
   const [lastLibrarySync, setLastLibrarySync] = useState<string | null>(localStorage.getItem('poi_last_cloud_sync'));
 
   const drawAPIRef = useRef<MapAPI | null>(null);
@@ -666,185 +665,185 @@ function DesktopApp() {
     const unsyncedCount = dbStats?.unsyncedCount ?? sourceTotal;
     const syncedCount = dbStats?.syncedCount ?? 0;
     const lastSyncText = lastLibrarySync
-      ? new Date(lastLibrarySync).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '-')
-      : '尚未同步';
+      ? new Date(lastLibrarySync).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '-')
+      : '—';
 
     return (
       <div className="data-manage-page">
-        <div className="data-manage-grid">
-          <section className="data-card">
-            <h3>云端上传</h3>
-            <p>本地库共 <b>{sourceTotal}</b> 条，未同步 <b>{unsyncedCount}</b> 条。支持全量和本次增量同步。</p>
-            <div className="data-action-row">
-              <button className="desktop-btn primary" onClick={() => handleUpload(sourcePois)} disabled={sourcePois.length === 0 || syncStatus === 'syncing'}>
-                {syncStatus === 'syncing' ? '上传中...' : `上传全部 (${sourceTotal}条)`}
-              </button>
-              <button className="desktop-btn" onClick={() => handleUpload(incrementalPois)} disabled={incrementalPois.length === 0 || syncStatus === 'syncing'}>
-                仅上传增量 ({incrementalPois.length}条)
-              </button>
+        {/* Compact stat bar */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
+          {[
+            { v: sourceTotal, l: '本地库', c: 'var(--fg)' },
+            { v: syncedCount, l: '已同步', c: 'var(--success)' },
+            { v: unsyncedCount, l: '待上传', c: 'var(--accent)' },
+            { v: dbStats?.duplicateCount ?? 0, l: '重复项', c: 'var(--warn)' },
+          ].map(s => (
+            <div key={s.l} style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)', textAlign: 'center' }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: s.c, fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>{s.v}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{s.l}</div>
             </div>
-            <div className="data-meta-line">上次同步：{lastSyncText}{cloudMergeResult ? ` · 本次合并: +${cloudMergeResult.inserted} 跳过${cloudMergeResult.skipped}` : ''}</div>
-          </section>
+          ))}
+        </div>
 
-          <section className="data-card data-card-tall">
-            <div className="data-card-heading">
-              <h3>☁ 从云端同步</h3>
-              <button className="desktop-btn" style={{ padding: '3px 12px', fontSize: 11 }}
-                onClick={async () => {
-                  setLoadingCloud(true);
-                  try { setCloudTasks(await getTasks()); } catch { showToast('获取云端任务失败', 'error'); }
-                  setLoadingCloud(false);
-                }}>
-                {loadingCloud ? '加载中...' : '🔄 刷新云端任务'}
-              </button>
-            </div>
-            <p>从 Supabase 拉取其他设备上传的数据，合并到本地数据库，重复项自动跳过。</p>
-            {cloudTasks.length > 0 ? cloudTasks.slice(0, 6).map(t => (
-              <div key={t.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <span style={{ fontWeight: 500 }}>{(() => { try { return JSON.parse(t.categories).join('、'); } catch { return t.categories; } })()}</span>
-                  <span style={{ color: 'var(--muted)', marginLeft: 8, fontSize: 11 }}>{t.total_pois} 条 · {new Date(t.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+        {/* Two-column main layout */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {/* Left: Actions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <section className="data-card">
+              <h3>☁ 云同步</h3>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  <button className="desktop-btn primary" style={{ flex: 1, justifyContent: 'center' }}
+                    onClick={() => handleUpload(sourcePois)} disabled={sourcePois.length === 0 || syncStatus === 'syncing'}>
+                    {syncStatus === 'syncing' ? '↑ 上传中...' : `↑ 上传全部 (${sourceTotal}条)`}
+                  </button>
+                  <button className="desktop-btn" style={{ flex: 1, justifyContent: 'center' }}
+                    onClick={() => handleUpload(incrementalPois)} disabled={incrementalPois.length === 0 || syncStatus === 'syncing'}>
+                    仅增量 ({incrementalPois.length}条)
+                  </button>
                 </div>
-                <button className="desktop-btn primary" style={{ padding: '3px 12px', fontSize: 11 }}
-                  onClick={async () => {
-                    try {
-                      const cloudPois = await getPois(t.id);
-                      const mapped = cloudPois.map((cp: any) => ({
-                        name: cp.name, category: cp.category || '',
-                        subcategory: cp.subcategory || '', address: cp.address || '',
-                        lng: cp.lng, lat: cp.lat, phone: cp.phone || '',
-                        rating: cp.rating ?? null,
-                      }));
-                      const result = await mergePoisToDb(mapped);
-                      setCloudMergeResult(result);
-                      showToast(`合并完成: 新增 ${result.inserted} 条, 跳过 ${result.skipped} 条`, 'success');
-                      loadPoiLibrary();
-                    } catch (e: any) { showToast('同步失败: ' + (e?.message || '未知错误'), 'error'); }
-                  }}>
-                  同步到本地
+                <div className="data-meta-line" style={{ fontSize: 11 }}>
+                  上次同步：{lastSyncText}{syncStatus === 'done' ? ' ✅' : ''}
+                </div>
+              </div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>从云端拉取</span>
+                  <button className="desktop-btn" style={{ padding: '2px 10px', fontSize: 10 }}
+                    onClick={async () => {
+                      setLoadingCloud(true);
+                      try { setCloudTasks(await getTasks()); } catch { showToast('获取云端任务失败', 'error'); }
+                      setLoadingCloud(false);
+                    }}>
+                    {loadingCloud ? '...' : '🔄 刷新'}
+                  </button>
+                </div>
+                {cloudTasks.length === 0 ? (
+                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>{loadingCloud ? '加载中...' : '暂无云端任务，点击刷新检查'}</p>
+                ) : (
+                  cloudTasks.slice(0, 4).map(t => (
+                    <div key={t.id} style={{ padding: '5px 0', borderBottom: '1px solid var(--border)', fontSize: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>
+                        <span style={{ fontWeight: 500 }}>{(() => { try { return JSON.parse(t.categories).join('、'); } catch { return t.categories; } })()}</span>
+                        <span style={{ color: 'var(--muted)', marginLeft: 6 }}>{t.total_pois}条</span>
+                      </span>
+                      <button className="desktop-btn" style={{ padding: '2px 8px', fontSize: 10 }}
+                        onClick={async () => {
+                          try {
+                            const cloudPois = await getPois(t.id);
+                            const mapped = cloudPois.map((cp: any) => ({
+                              name: cp.name, category: cp.category || '',
+                              subcategory: cp.subcategory || '', address: cp.address || '',
+                              lng: cp.lng, lat: cp.lat, phone: cp.phone || '', rating: cp.rating ?? null,
+                            }));
+                            const result = await mergePoisToDb(mapped);
+                            showToast(`合并: +${result.inserted} 跳过${result.skipped}`, 'success');
+                            loadPoiLibrary();
+                          } catch (e: any) { showToast('失败: ' + (e?.message || ''), 'error'); }
+                        }}>
+                        ↓ 同步
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section className="data-card">
+              <h3>📥 数据导出</h3>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="desktop-btn primary" style={{ flex: 1, justifyContent: 'center' }}
+                  disabled={!collection.taskId && sourcePois.length === 0}
+                  onClick={() => collection.taskId ? window.open(getExportUrl(collection.taskId, 'xlsx'), '_blank') : clientExport(sourcePois, 'csv')}>
+                  Excel
+                </button>
+                <button className="desktop-btn" style={{ flex: 1, justifyContent: 'center' }}
+                  disabled={sourcePois.length === 0} onClick={() => clientExport(sourcePois, 'csv')}>CSV</button>
+                <button className="desktop-btn" style={{ flex: 1, justifyContent: 'center' }}
+                  disabled={sourcePois.length === 0} onClick={() => clientExport(sourcePois, 'geojson')}>GeoJSON</button>
+              </div>
+            </section>
+          </div>
+
+          {/* Right: Data */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <section className="data-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <h3>📊 按区域存储</h3>
+                <button className="desktop-btn" onClick={loadPoiLibrary} disabled={loadingLibrary} style={{ padding: '2px 10px', fontSize: 10 }}>
+                  {loadingLibrary ? '...' : '刷新'}
                 </button>
               </div>
-            )) : (
-              <div className="desktop-empty-state compact">
-                <strong>{loadingCloud ? '加载云端任务中...' : '暂无云端任务'}</strong>
-                <span>点击刷新查看其他设备上传到 Supabase 的采集任务。</span>
-              </div>
-            )}
-          </section>
-
-          <section className="data-card">
-            <h3>数据导出</h3>
-            <p>导出为 Excel、CSV 或 GeoJSON 格式，后续可扩展为按行政区筛选导出。</p>
-            <div className="data-action-row">
-              <button className="desktop-btn primary" disabled={!collection.taskId && sourcePois.length === 0}
-                onClick={() => collection.taskId ? window.open(getExportUrl(collection.taskId, 'xlsx'), '_blank') : clientExport(sourcePois, 'csv')}>
-                导出 Excel
-              </button>
-              <button className="desktop-btn" disabled={sourcePois.length === 0} onClick={() => clientExport(sourcePois, 'csv')}>导出 CSV</button>
-              <button className="desktop-btn" disabled={sourcePois.length === 0} onClick={() => clientExport(sourcePois, 'geojson')}>按区域导出</button>
-            </div>
-          </section>
-
-          <section className="data-card data-card-tall">
-            <div className="data-card-heading">
-              <h3>按区域存储</h3>
-              <button className="desktop-btn" onClick={loadPoiLibrary} disabled={loadingLibrary}>{loadingLibrary ? '刷新中...' : '刷新本地库'}</button>
-            </div>
-            {districtDrill ? (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <strong style={{ fontSize: 14 }}>{districtDrill} · {drillPois.length} 条</strong>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button className="desktop-btn" style={{ padding: '3px 10px', fontSize: 10 }}
-                      onClick={() => clientExport(drillPois, 'csv')}>导出 CSV</button>
-                    <button className="desktop-btn" style={{ padding: '3px 10px', fontSize: 10 }}
-                      onClick={() => clientExport(drillPois, 'geojson')}>导出 GeoJSON</button>
-                    <button className="desktop-btn" style={{ padding: '3px 12px', fontSize: 11 }}
-                      onClick={() => { setDistrictDrill(null); setDrillPois([]); }}>← 返回</button>
+              {districtDrill ? (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <strong style={{ fontSize: 13 }}>{districtDrill} · {drillPois.length} 条</strong>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="desktop-btn" style={{ padding: '2px 8px', fontSize: 10 }} onClick={() => clientExport(drillPois, 'csv')}>CSV</button>
+                      <button className="desktop-btn" style={{ padding: '2px 8px', fontSize: 10 }} onClick={() => clientExport(drillPois, 'geojson')}>GeoJSON</button>
+                      <button className="desktop-btn" style={{ padding: '2px 8px', fontSize: 10 }} onClick={() => { setDistrictDrill(null); setDrillPois([]); }}>← 返回</button>
+                    </div>
                   </div>
-                </div>
-                <div style={{ maxHeight: 360, overflow: 'auto' }}>
-                  {loadingDrill ? (
-                    <div className="desktop-empty-state compact"><strong>加载中...</strong></div>
-                  ) : (
+                  <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                       <thead><tr style={{ borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--surface)' }}>
-                        {['名称', '类别', '地址', '电话', '坐标'].map(h => (
-                          <th key={h} style={{ textAlign: 'left', padding: '4px 6px', fontSize: 10, fontWeight: 600, color: 'var(--muted)' }}>{h}</th>
+                        {['名称', '类别', '地址', '坐标'].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '3px 6px', fontSize: 10, fontWeight: 600, color: 'var(--muted)' }}>{h}</th>
                         ))}
                       </tr></thead>
                       <tbody>
-                        {drillPois.map(p => (
+                        {drillPois.slice(0, 100).map(p => (
                           <tr key={p.id} style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
                             onClick={() => { setSelectedPoi(p); setView('detail'); }}>
-                            <td style={{ padding: '4px 6px', fontWeight: 500 }}>{p.name}</td>
-                            <td style={{ padding: '4px 6px', color: 'var(--muted)' }}>{catName(p.category)}</td>
-                            <td style={{ padding: '4px 6px', color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address || '—'}</td>
-                            <td style={{ padding: '4px 6px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{p.phone || '—'}</td>
-                            <td style={{ padding: '4px 6px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{p.lng?.toFixed(4)},{p.lat?.toFixed(4)}</td>
+                            <td style={{ padding: '3px 6px', fontWeight: 500, fontSize: 12 }}>{p.name}</td>
+                            <td style={{ padding: '3px 6px', color: 'var(--muted)', fontSize: 11 }}>{catName(p.category)}</td>
+                            <td style={{ padding: '3px 6px', color: 'var(--muted)', fontSize: 11, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address || '—'}</td>
+                            <td style={{ padding: '3px 6px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{p.lng?.toFixed(4)},{p.lat?.toFixed(4)}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  )}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <>
-                <p>采集数据写入本地数据库，按区县自动归类。点击区域查看详情。</p>
-                <div className="area-store-list">
+              ) : (
+                <>
                   {dbStats && dbStats.byDistrict.length > 0 ? dbStats.byDistrict.map((d) => (
-                    <div key={d.district} className="area-store-card" style={{ cursor: 'pointer' }}
+                    <div key={d.district} className="area-store-card" style={{ cursor: 'pointer', padding: '8px 10px' }}
                       onClick={async () => {
                         setDistrictDrill(d.district);
                         setLoadingDrill(true);
-                        try {
-                          const result = await queryPoiLibrary({ page: 1, pageSize: 200, district: d.district });
-                          setDrillPois(result.pois);
-                        } catch { showToast('加载区域数据失败', 'error'); }
+                        try { const r = await queryPoiLibrary({ page: 1, pageSize: 200, district: d.district }); setDrillPois(r.pois); } catch {}
                         setLoadingDrill(false);
                       }}>
-                      <div className="area-store-title">
-                        <strong>{d.district}</strong>
-                        <span>{d.count} 条</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: 13 }}>{d.district}</strong>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)' }}>{d.count} 条</span>
                       </div>
-                      <div className="area-store-scope">区县级采集区域</div>
-                      <div className="area-store-row">
-                        <span>占本地库</span>
-                        <b>{Math.round((d.count / Math.max(dbStats.total, 1)) * 100)}%</b>
+                      <div style={{ height: 3, background: 'var(--border)', borderRadius: 2, marginTop: 4, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${Math.round((d.count / Math.max(dbStats.total, 1)) * 100)}%`, background: 'var(--accent)', borderRadius: 2 }} />
                       </div>
                     </div>
                   )) : (
-                    <div className="desktop-empty-state compact">
-                      <strong>本地数据库暂无数据</strong>
-                      <span>完成一次服务端采集后，数据会自动写入这里并按区县归类。</span>
-                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: 16 }}>暂无数据，完成采集后自动归类</p>
                   )}
-                </div>
-              </>
-            )}
-          </section>
+                </>
+              )}
+            </section>
 
-          <section className="data-card data-card-tall">
-            <h3>重复检测</h3>
-            <p>采集前后对比同名同地址商户，减少重复入库和重复上传。</p>
-            <div className="duplicate-summary">
-              本地库共 {dbStats?.total || sourcePois.length} 条，检测到 {dbStats?.duplicateCount || 0} 条重复记录
-            </div>
-            <div className="duplicate-list">
+            <section className="data-card">
+              <h3>🔄 重复检测</h3>
+              <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>
+                本地库 <b>{dbStats?.total || sourceTotal}</b> 条 · 同名同地址重复 <b style={{ color: 'var(--warn)' }}>{dbStats?.duplicateCount || 0}</b> 条
+              </p>
               {dbStats && dbStats.duplicateCount > 0 ? (
-                <div className="desktop-empty-state compact">
-                  <strong>{dbStats.duplicateCount} 条重复</strong>
-                  <span>同名同地址的 POI 已标记，可在商户详情中处理。</span>
+                <div style={{ padding: '6px 10px', borderRadius: 6, background: '#fff7ed', border: '1px solid #fed7aa', fontSize: 12, color: 'var(--warn)' }}>
+                  可在商户详情页逐条处理重复项。
                 </div>
               ) : (
-                <div className="desktop-empty-state compact">
-                  <strong>暂无重复记录</strong>
-                  <span>{dbStats ? '本地库未发现同名同地址重复。' : sourcePois.length > 0 ? '正在加载统计...' : '暂无数据可检测。'}</span>
-                </div>
+                <p style={{ fontSize: 12, color: 'var(--muted)' }}>✓ 暂未检测到重复</p>
               )}
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
       </div>
     );
