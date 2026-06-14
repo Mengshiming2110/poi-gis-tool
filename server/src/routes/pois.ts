@@ -1,7 +1,17 @@
 import { Router, Request, Response } from 'express';
-import { queryPoiLibrary, queryPois, queryPoiLibraryStats, markPoisSynced, getUnsyncedPois } from '../db';
+import { queryPoiLibrary, queryPois, queryPoiLibraryStats, markPoisSynced, getUnsyncedPois, mergeCloudPois } from '../db';
 
 const router = Router();
+
+router.post('/merge', (req: Request, res: Response) => {
+  const { pois } = req.body;
+  if (!Array.isArray(pois) || pois.length === 0) {
+    res.status(400).json({ error: '请提供要合并的 POI 列表' });
+    return;
+  }
+  const result = mergeCloudPois(pois);
+  res.json(result);
+});
 
 router.post('/mark-synced', (req: Request, res: Response) => {
   const { ids } = req.body;

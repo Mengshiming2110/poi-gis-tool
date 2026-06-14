@@ -3,8 +3,8 @@ import MapView from './MapView';
 import UpdatePrompt from './UpdatePrompt';
 import { useCollection } from '../hooks/useCollection';
 import { useSSE } from '../hooks/useSSE';
-import { getExportUrl, markPoisSynced, queryPoiLibrary, queryPoiLibraryStats, queryPois, type PoiLibraryStats } from '../services/api';
-import { createCloudTask, insertCloudPois } from '../services/supabase';
+import { getExportUrl, markPoisSynced, mergeCloudPois as mergePoisToDb, queryPoiLibrary, queryPoiLibraryStats, queryPois, type PoiLibraryStats } from '../services/api';
+import { createCloudTask, insertCloudPois, getTasks, getPois, type CloudTask } from '../services/supabase';
 import { checkForUpdate, CURRENT_VERSION, RELEASES_URL, type UpdateInfo } from '../services/updater';
 import { CATEGORY_LIST, type PoiRecord } from '../types/poi';
 import type { MapAPI, DrawnShape, GridCell } from './MapView';
@@ -142,6 +142,9 @@ function DesktopApp() {
   const [districtDrill, setDistrictDrill] = useState<string | null>(null);
   const [drillPois, setDrillPois] = useState<PoiRecord[]>([]);
   const [loadingDrill, setLoadingDrill] = useState(false);
+  const [cloudTasks, setCloudTasks] = useState<CloudTask[]>([]);
+  const [loadingCloud, setLoadingCloud] = useState(false);
+  const [cloudMergeResult, setCloudMergeResult] = useState<{ inserted: number; skipped: number } | null>(null);
   const [lastLibrarySync, setLastLibrarySync] = useState<string | null>(localStorage.getItem('poi_last_cloud_sync'));
 
   const drawAPIRef = useRef<MapAPI | null>(null);
@@ -680,7 +683,53 @@ function DesktopApp() {
                 仅上传增量 ({incrementalPois.length}条)
               </button>
             </div>
-            <div className="data-meta-line">上次同步：{lastSyncText}</div>
+            <div className="data-meta-line">上次同步：{lastSyncText}{cloudMergeResult ? ` · 本次合并: +${cloudMergeResult.inserted} 跳过${cloudMergeResult.skipped}` : ''}</div>
+          </section>
+
+          <section className="data-card data-card-tall">
+            <div className="data-card-heading">
+              <h3>☁ 从云端同步</h3>
+              <button className="desktop-btn" style={{ padding: '3px 12px', fontSize: 11 }}
+                onClick={async () => {
+                  setLoadingCloud(true);
+                  try { setCloudTasks(await getTasks()); } catch { showToast('获取云端任务失败', 'error'); }
+                  setLoadingCloud(false);
+                }}>
+                {loadingCloud ? '加载中...' : '🔄 刷新云端任务'}
+              </button>
+            </div>
+            <p>从 Supabase 拉取其他设备上传的数据，合并到本地数据库，重复项自动跳过。</p>
+            {cloudTasks.length > 0 ? cloudTasks.slice(0, 6).map(t => (
+              <div key={t.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontWeight: 500 }}>{(() => { try { return JSON.parse(t.categories).join('、'); } catch { return t.categories; } })()}</span>
+                  <span style={{ color: 'var(--muted)', marginLeft: 8, fontSize: 11 }}>{t.total_pois} 条 · {new Date(t.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <button className="desktop-btn primary" style={{ padding: '3px 12px', fontSize: 11 }}
+                  onClick={async () => {
+                    try {
+                      const cloudPois = await getPois(t.id);
+                      const mapped = cloudPois.map((cp: any) => ({
+                        name: cp.name, category: cp.category || '',
+                        subcategory: cp.subcategory || '', address: cp.address || '',
+                        lng: cp.lng, lat: cp.lat, phone: cp.phone || '',
+                        rating: cp.rating ?? null,
+                      }));
+                      const result = await mergePoisToDb(mapped);
+                      setCloudMergeResult(result);
+                      showToast(`合并完成: 新增 ${result.inserted} 条, 跳过 ${result.skipped} 条`, 'success');
+                      loadPoiLibrary();
+                    } catch (e: any) { showToast('同步失败: ' + (e?.message || '未知错误'), 'error'); }
+                  }}>
+                  同步到本地
+                </button>
+              </div>
+            )) : (
+              <div className="desktop-empty-state compact">
+                <strong>{loadingCloud ? '加载云端任务中...' : '暂无云端任务'}</strong>
+                <span>点击刷新查看其他设备上传到 Supabase 的采集任务。</span>
+              </div>
+            )}
           </section>
 
           <section className="data-card">

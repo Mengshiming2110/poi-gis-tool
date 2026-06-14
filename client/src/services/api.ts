@@ -96,6 +96,19 @@ export async function queryPoiLibraryStats(): Promise<PoiLibraryStats> {
   return res.json();
 }
 
+export async function mergeCloudPois(pois: {
+  name: string; category: string; subcategory?: string; address?: string;
+  lng: number; lat: number; phone?: string; rating?: number | null;
+}[]): Promise<{ inserted: number; skipped: number }> {
+  const res = await fetch(`${BASE}/pois/merge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pois }),
+  });
+  if (!res.ok) throw new Error('合并云端数据失败');
+  return res.json();
+}
+
 export async function markPoisSynced(ids: number[]): Promise<{ count: number }> {
   const res = await fetch(`${BASE}/pois/mark-synced`, {
     method: 'POST',

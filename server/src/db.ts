@@ -267,6 +267,34 @@ export function markPoisSynced(ids: number[]): number {
   return ids.length;
 }
 
+export function mergeCloudPois(pois: {
+  name: string; category: string; subcategory?: string; address?: string;
+  lng: number; lat: number; phone?: string; rating?: number | null;
+}[]): { inserted: number; skipped: number } {
+  db.run('BEGIN');
+  const checkStmt = db.prepare('SELECT COUNT(*) as c FROM pois WHERE name = ? AND ABS(lng - ?) < 0.0005 AND ABS(lat - ?) < 0.0005');
+  const insertStmt = db.prepare(
+    "INSERT INTO pois (task_id, name, category, subcategory, address, lng, lat, phone, rating, sync_status) VALUES ('cloud-import', ?, ?, ?, ?, ?, ?, ?, ?, 'synced')"
+  );
+  let inserted = 0, skipped = 0;
+  for (const p of pois) {
+    checkStmt.bind([p.name, p.lng, p.lat]);
+    checkStmt.step();
+    const { c } = checkStmt.getAsObject() as { c: number };
+    checkStmt.reset();
+    if (c > 0) { skipped++; continue; }
+    insertStmt.bind([p.name, p.category, p.subcategory || '', p.address || '', p.lng, p.lat, p.phone || '', p.rating ?? null]);
+    insertStmt.step();
+    insertStmt.reset();
+    inserted++;
+  }
+  checkStmt.free();
+  insertStmt.free();
+  db.run('COMMIT');
+  saveDb();
+  return { inserted, skipped };
+}
+
 export function getUnsyncedPois(taskId?: string): PoiRecord[] {
   let stmt;
   if (taskId) {
