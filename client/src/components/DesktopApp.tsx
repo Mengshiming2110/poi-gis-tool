@@ -129,6 +129,7 @@ function DesktopApp() {
   const [gridCells, setGridCells] = useState<GridCell[]>([]);
   const [toast, setToast] = useState<{ msg: string; type: 'info' | 'success' | 'error' } | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [apiStatus, setApiStatus] = useState<'idle' | 'busy' | 'error'>('idle');
   const [searchFilter, setSearchFilter] = useState({ type: '全部', region: 'all', query: '' });
   const [selectedPoi, setSelectedPoi] = useState<PoiRecord | null>(null);
@@ -913,16 +914,22 @@ function DesktopApp() {
         <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>📋 版本管理</h4>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', fontFamily: 'var(--font-mono)' }}>v{CURRENT_VERSION}</span>
-          <span style={{ fontSize: 11, color: updateInfo?.error ? 'var(--warn)' : updateInfo?.available ? 'var(--accent)' : 'var(--muted)' }}>
-            {updateInfo?.error ? '⚠ 检查失败，点击下方按钮手动下载' : updateInfo?.available ? `发现 ${updateInfo.version}` : '✓ 已是最新'}
+          <span style={{ fontSize: 11, color: checkingUpdate ? 'var(--muted)' : updateInfo?.error ? 'var(--warn)' : updateInfo?.available ? 'var(--accent)' : 'var(--muted)' }}>
+            {checkingUpdate ? '检查中...' : updateInfo?.error ? '⚠ 检查失败，点击下方按钮手动下载' : updateInfo?.available ? `发现 ${updateInfo.version}` : '✓ 已是最新'}
           </span>
         </div>
         <button className="desktop-btn" style={{ width: '100%', justifyContent: 'center', padding: '6px 0' }}
-          onClick={() => checkForUpdate().then(i => {
-            if (i.available) setUpdateInfo(i);
-            else if (i.error) setUpdateInfo(i);
-            else setUpdateInfo(null);
-          })}>🔄 检查更新</button>
+          disabled={checkingUpdate}
+          onClick={async () => {
+            setCheckingUpdate(true);
+            try {
+              const i = await checkForUpdate();
+              if (i.available) { setUpdateInfo(i); showToast(`发现新版本 ${i.version}`, 'success'); }
+              else if (i.error) { setUpdateInfo(i); showToast('连接失败，请手动下载', 'error'); }
+              else { setUpdateInfo(null); showToast('已是最新版本', 'info'); }
+            } catch { showToast('检查失败', 'error'); }
+            setCheckingUpdate(false);
+          }}>{checkingUpdate ? '⏳ 检查中...' : '🔄 检查更新'}</button>
         {updateInfo?.error && (
           <a href={updateInfo.url} target="_blank" rel="noopener noreferrer"
             style={{ display: 'block', marginTop: 8, textAlign: 'center', fontSize: 12, color: 'var(--accent)' }}>
