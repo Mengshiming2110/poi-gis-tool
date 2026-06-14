@@ -16,6 +16,32 @@ function UpdatePrompt({ version, url, body, downloadUrl, onDismiss }: Props) {
   const [dlError, setDlError] = useState('');
   const [blobData, setBlobData] = useState<Uint8Array | null>(null);
 
+  // Build mirror URLs for GitHub assets
+  const getMirrorUrls = (originalUrl: string): string[] => {
+    // ghproxy.com — widely used GitHub mirror in China
+    const urls = [originalUrl];
+    try {
+      const u = new URL(originalUrl);
+      urls.push(`https://ghproxy.com/${u.href}`);
+      urls.push(`https://mirror.ghproxy.com/${u.href}`);
+    } catch { /* keep original only */ }
+    return urls;
+  };
+
+  const tryDownload = async (urls: string[]): Promise<Response> => {
+    let lastError: Error | null = null;
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+        if (res.ok) return res;
+        lastError = new Error(`HTTP ${res.status}`);
+      } catch (e: any) {
+        lastError = e;
+      }
+    }
+    throw lastError || new Error('所有下载源均不可用');
+  };
+
   const handleDownload = async () => {
     if (!downloadUrl || dlState === 'downloading') return;
     setDlState('downloading');
@@ -23,8 +49,8 @@ function UpdatePrompt({ version, url, body, downloadUrl, onDismiss }: Props) {
     setDlError('');
 
     try {
-      const res = await fetch(downloadUrl);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const urls = getMirrorUrls(downloadUrl);
+      const res = await tryDownload(urls);
       const total = Number(res.headers.get('content-length')) || 0;
       const reader = res.body?.getReader();
       if (!reader) throw new Error('无法读取响应流');
