@@ -1,7 +1,23 @@
 import { Router, Request, Response } from 'express';
-import { queryPoiLibrary, queryPois, queryPoiLibraryStats } from '../db';
+import { queryPoiLibrary, queryPois, queryPoiLibraryStats, markPoisSynced, getUnsyncedPois } from '../db';
 
 const router = Router();
+
+router.post('/mark-synced', (req: Request, res: Response) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: '请提供要标记的 POI ID 列表' });
+    return;
+  }
+  const count = markPoisSynced(ids);
+  res.json({ count });
+});
+
+router.get('/unsynced', (req: Request, res: Response) => {
+  const { taskId } = req.query;
+  const pois = getUnsyncedPois(taskId ? String(taskId) : undefined);
+  res.json({ pois, total: pois.length });
+});
 
 router.get('/library/stats', (_req: Request, res: Response) => {
   const stats = queryPoiLibraryStats();

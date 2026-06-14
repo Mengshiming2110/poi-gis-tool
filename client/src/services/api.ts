@@ -86,11 +86,23 @@ export interface PoiLibraryStats {
   byDistrict: { district: string; count: number }[];
   byCategory: { category: string; count: number }[];
   duplicateCount: number;
+  unsyncedCount: number;
+  syncedCount: number;
 }
 
 export async function queryPoiLibraryStats(): Promise<PoiLibraryStats> {
   const res = await fetch(`${BASE}/pois/library/stats`);
   if (!res.ok) throw new Error('获取本地库统计失败');
+  return res.json();
+}
+
+export async function markPoisSynced(ids: number[]): Promise<{ count: number }> {
+  const res = await fetch(`${BASE}/pois/mark-synced`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+  if (!res.ok) throw new Error('标记同步状态失败');
   return res.json();
 }
 

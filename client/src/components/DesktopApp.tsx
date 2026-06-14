@@ -3,7 +3,7 @@ import MapView from './MapView';
 import UpdatePrompt from './UpdatePrompt';
 import { useCollection } from '../hooks/useCollection';
 import { useSSE } from '../hooks/useSSE';
-import { getExportUrl, queryPoiLibrary, queryPoiLibraryStats, queryPois, type PoiLibraryStats } from '../services/api';
+import { getExportUrl, markPoisSynced, queryPoiLibrary, queryPoiLibraryStats, queryPois, type PoiLibraryStats } from '../services/api';
 import { createCloudTask, insertCloudPois } from '../services/supabase';
 import { checkForUpdate, CURRENT_VERSION, RELEASES_URL, type UpdateInfo } from '../services/updater';
 import { CATEGORY_LIST, type PoiRecord } from '../types/poi';
@@ -629,8 +629,11 @@ function DesktopApp() {
       const syncedAt = new Date().toISOString();
       localStorage.setItem('poi_last_cloud_sync', syncedAt);
       setLastLibrarySync(syncedAt);
+      // Mark uploaded POIs as synced in local DB
+      await markPoisSynced(poisToUpload.filter(p => p.id).map(p => p.id));
       setSyncStatus('done');
       showToast(`已上传 ${poisToUpload.length} 条到云端`, 'success');
+      loadPoiLibrary(); // refresh stats
     } catch (e: any) {
       setSyncStatus('error');
       showToast(e?.message || '上传失败', 'error');
@@ -657,7 +660,8 @@ function DesktopApp() {
     const sourceTotal = libraryTotal || sourcePois.length;
     const dbStats = libraryStats;
     const incrementalPois = collectedPois.length > 0 ? collectedPois : sourcePois;
-    const unsyncedCount = sourceTotal; // TODO: track sync_status per POI
+    const unsyncedCount = dbStats?.unsyncedCount ?? sourceTotal;
+    const syncedCount = dbStats?.syncedCount ?? 0;
     const lastSyncText = lastLibrarySync
       ? new Date(lastLibrarySync).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '-')
       : '尚未同步';
@@ -701,8 +705,14 @@ function DesktopApp() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <strong style={{ fontSize: 14 }}>{districtDrill} · {drillPois.length} 条</strong>
-                  <button className="desktop-btn" style={{ padding: '3px 12px', fontSize: 11 }}
-                    onClick={() => { setDistrictDrill(null); setDrillPois([]); }}>← 返回区域列表</button>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="desktop-btn" style={{ padding: '3px 10px', fontSize: 10 }}
+                      onClick={() => clientExport(drillPois, 'csv')}>导出 CSV</button>
+                    <button className="desktop-btn" style={{ padding: '3px 10px', fontSize: 10 }}
+                      onClick={() => clientExport(drillPois, 'geojson')}>导出 GeoJSON</button>
+                    <button className="desktop-btn" style={{ padding: '3px 12px', fontSize: 11 }}
+                      onClick={() => { setDistrictDrill(null); setDrillPois([]); }}>← 返回</button>
+                  </div>
                 </div>
                 <div style={{ maxHeight: 360, overflow: 'auto' }}>
                   {loadingDrill ? (

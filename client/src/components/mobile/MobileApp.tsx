@@ -17,6 +17,9 @@ import { useAmap, type DrawnShape } from '../../hooks/useAmap';
 import { checkForUpdate, CURRENT_VERSION, RELEASES_URL, type UpdateInfo } from '../../services/updater';
 import { CATEGORY_LIST } from '../../types/poi';
 
+const MCAT_COLOR: Record<string, string> = {};
+CATEGORY_LIST.forEach(c => { MCAT_COLOR[c.code] = c.color; });
+
 type MobileTab = 'map' | 'data' | 'progress' | 'settings';
 
 const TAB_META: Record<MobileTab, { label: string; icon: React.ReactNode }> = {
@@ -60,6 +63,18 @@ function MobileApp() {
       }, 100);
     }
   }, [tab, amap.map]);
+
+  // Show POI markers on mobile map when data available
+  useEffect(() => {
+    if (poiData.length > 0 && amap.loaded) {
+      amap.showPoiMarkers(poiData.map((p: any) => ({
+        lng: p.lng, lat: p.lat, name: p.name,
+        category: MCAT_COLOR[p.category] ? p.category : '未分类',
+        address: p.address, phone: p.phone,
+        color: MCAT_COLOR[p.category] || 'var(--accent)',
+      })));
+    }
+  }, [poiData, amap.loaded]);
 
   const selectedNames = useMemo(() => CATEGORY_LIST
     .filter((c) => categories.includes(c.code))
@@ -264,6 +279,13 @@ function MobileApp() {
               <div className="setting-row"><span>请求间隔</span><b>{localStorage.getItem('amap_request_delay') || '500'}ms</b></div>
               <div className="setting-row"><span>请求最大页数</span><b>{localStorage.getItem('amap_max_pages_per_query') || '2'} 页</b></div>
               <div className="setting-row"><span>密集切分阈值</span><b>{localStorage.getItem('amap_dense_split_threshold') || '80'} 条</b></div>
+              <div className="setting-row" onClick={() => {
+                const v = localStorage.getItem('amap_debug_mode');
+                localStorage.setItem('amap_debug_mode', v === 'true' ? 'false' : 'true');
+              }}>
+                <span>🔧 调试模式（模拟POI）</span>
+                <b className={`switch ${localStorage.getItem('amap_debug_mode') === 'true' ? 'on' : ''}`} />
+              </div>
             </div>
             <div className="set-card">
               <h4>版本管理</h4>

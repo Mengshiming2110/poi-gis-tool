@@ -78,6 +78,10 @@ export async function initDb(): Promise<void> {
   if (!poiColumns.includes('city')) db.run('ALTER TABLE pois ADD COLUMN city TEXT');
   if (!poiColumns.includes('district')) db.run('ALTER TABLE pois ADD COLUMN district TEXT');
   if (!poiColumns.includes('town')) db.run('ALTER TABLE pois ADD COLUMN town TEXT');
+  if (!poiColumns.includes('sync_status')) {
+    db.run("ALTER TABLE pois ADD COLUMN sync_status TEXT DEFAULT 'pending'");
+    db.run("UPDATE pois SET sync_status = 'pending' WHERE sync_status IS NULL");
+  }
   saveDb();
 }
 
@@ -221,6 +225,8 @@ export function queryPoiLibraryStats(): {
   byDistrict: { district: string; count: number }[];
   byCategory: { category: string; count: number }[];
   duplicateCount: number;
+  unsyncedCount: number;
+  syncedCount: number;
 } {
   const totalRow = db.exec('SELECT COUNT(*) as c FROM pois')[0]?.values[0];
   const total = totalRow ? Number(totalRow[0]) : 0;
@@ -244,7 +250,35 @@ export function queryPoiLibraryStats(): {
   const dupRow = db.exec('SELECT COUNT(*) as c FROM (SELECT name, address, COUNT(*) as cnt FROM pois GROUP BY name, address HAVING cnt > 1)')[0]?.values[0];
   const duplicateCount = dupRow ? Number(dupRow[0]) : 0;
 
-  return { total, byDistrict, byCategory, duplicateCount };
+  const unsyncedRow = db.exec("SELECT COUNT(*) as c FROM pois WHERE sync_status = 'pending'")[0]?.values[0];
+  const unsyncedCount = unsyncedRow ? Number(unsyncedRow[0]) : 0;
+
+  const syncedRow = db.exec("SELECT COUNT(*) as c FROM pois WHERE sync_status = 'synced'")[0]?.values[0];
+  const syncedCount = syncedRow ? Number(syncedRow[0]) : 0;
+
+  return { total, byDistrict, byCategory, duplicateCount, unsyncedCount, syncedCount };
+}
+
+export function markPoisSynced(ids: number[]): number {
+  if (ids.length === 0) return 0;
+  const placeholders = ids.map(() => '?').join(',');
+  db.run(`UPDATE pois SET sync_status = 'synced' WHERE id IN (${placeholders})`, ids);
+  saveDb();
+  return ids.length;
+}
+
+export function getUnsyncedPois(taskId?: string): PoiRecord[] {
+  let stmt;
+  if (taskId) {
+    stmt = db.prepare("SELECT * FROM pois WHERE task_id = ? AND sync_status = 'pending'");
+    stmt.bind([taskId]);
+  } else {
+    stmt = db.prepare("SELECT * FROM pois WHERE sync_status = 'pending'");
+  }
+  const pois: PoiRecord[] = [];
+  while (stmt.step()) { pois.push(rowToObj(stmt) as PoiRecord); }
+  stmt.free();
+  return pois;
 }
 
 export function getTaskPoisForExport(taskId: string): PoiRecord[] {
