@@ -123,9 +123,8 @@ function DesktopApp() {
   useEffect(() => {
     checkForUpdate().then((info) => {
       if (info.available) setUpdateInfo(info);
-      else if (info.error) setUpdateInfo(info); // store error state for UI display
+      else if (info.error) setUpdateInfo(info);
     });
-    // Navigate to settings if redirected from welcome screen
     if (localStorage.getItem('poi_goto_settings') === '1') {
       localStorage.removeItem('poi_goto_settings');
       setView('settings');
@@ -224,6 +223,22 @@ function DesktopApp() {
   const showToast = useCallback((msg: string, type: 'info' | 'success' | 'error' = 'info') => {
     setToast({ msg, type }); setTimeout(() => setToast(null), 2500);
   }, []);
+
+  const doCheckUpdate = useCallback(async () => {
+    const info = await checkForUpdate();
+    if (info.available) {
+      setUpdateInfo(info);
+    } else if (info.error) {
+      setUpdateInfo(info);
+    }
+    return info;
+  }, []);
+
+  // Periodic auto-check every 30 minutes
+  useEffect(() => {
+    const timer = setInterval(() => doCheckUpdate(), 30 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [doCheckUpdate]);
 
   const loadPoiLibrary = useCallback(async () => {
     setLoadingLibrary(true);
@@ -921,12 +936,10 @@ function DesktopApp() {
           disabled={checkingUpdate}
           onClick={async () => {
             setCheckingUpdate(true);
-            try {
-              const i = await checkForUpdate();
-              if (i.available) { setUpdateInfo(i); showToast(`发现新版本 ${i.version}`, 'success'); }
-              else if (i.error) { setUpdateInfo(i); showToast('连接失败，请手动下载', 'error'); }
-              else { setUpdateInfo(null); showToast('已是最新版本', 'info'); }
-            } catch { showToast('检查失败', 'error'); }
+            const info = await doCheckUpdate();
+            if (info.available) showToast(`发现新版本 ${info.version}`, 'success');
+            else if (info.error) showToast('连接失败，请手动下载', 'error');
+            else showToast('已是最新版本', 'info');
             setCheckingUpdate(false);
           }}>{checkingUpdate ? '⏳ 检查中...' : '🔄 检查更新'}</button>
         {updateInfo?.error && (
@@ -960,7 +973,12 @@ function DesktopApp() {
         {NAV_MANAGE.map(item => (
           <button key={item.id}
             className={`desktop-nav-item ${view === item.id ? 'active' : ''}`}
-            onClick={() => setView(item.id)}>{item.label}</button>
+            onClick={() => setView(item.id)}>
+            {item.label}
+            {item.id === 'settings' && updateInfo?.available && (
+              <span style={{ marginLeft: 6, width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+            )}
+          </button>
         ))}
         <div className="desktop-sidebar-footer">
           <button className="desktop-nav-item" onClick={() => setDark(!dark)}>
