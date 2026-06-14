@@ -125,6 +125,11 @@ function DesktopApp() {
       if (info.available) setUpdateInfo(info);
       else if (info.error) setUpdateInfo(info); // store error state for UI display
     });
+    // Navigate to settings if redirected from welcome screen
+    if (localStorage.getItem('poi_goto_settings') === '1') {
+      localStorage.removeItem('poi_goto_settings');
+      setView('settings');
+    }
   }, []);
   useEffect(() => {
     const saved = localStorage.getItem('theme');
