@@ -21,10 +21,11 @@ function UpdatePrompt({ version, url, body, downloadUrl, onDismiss }: Props) {
     const urls = [originalUrl];
     try {
       const u = new URL(originalUrl);
-      // Common GitHub mirrors
+      // Widely-used Chinese GitHub mirrors (2025)
+      urls.push(`https://ghfast.top/${u.href}`);
+      urls.push(`https://ghp.ci/${u.href}`);
       urls.push(`https://ghproxy.net/${u.href}`);
-      urls.push(`https://gh-proxy.com/${u.href}`);
-      urls.push(`https://mirror.ghproxy.com/${u.href}`);
+      urls.push(`https://github.moeyy.xyz/${u.href}`);
     } catch { /* keep original only */ }
     return urls;
   };
@@ -189,13 +190,19 @@ function UpdatePrompt({ version, url, body, downloadUrl, onDismiss }: Props) {
               软件内下载失败：{dlError}
             </div>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
-              GitHub 服务器在国内可能不稳定，请通过浏览器手动下载安装包。
+              所有镜像源均无法连接，请通过以下方式手动下载：
             </div>
             <a href={url} target="_blank" rel="noopener noreferrer"
               style={{ display: 'block', textAlign: 'center', padding: '10px 0', borderRadius: 8,
                 background: '#3b82f6', color: '#fff', fontSize: 14, fontWeight: 600,
                 textDecoration: 'none', marginBottom: 6 }}>
-              打开 GitHub Releases 页面下载
+              GitHub Releases 页面
+            </a>
+            <a href={url.replace('github.com', 'kkgithub.com')} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'block', textAlign: 'center', padding: '10px 0', borderRadius: 8,
+                background: '#6366f1', color: '#fff', fontSize: 14, fontWeight: 600,
+                textDecoration: 'none', marginBottom: 6 }}>
+              国内镜像 (kkgithub)
             </a>
             <button onClick={() => {
               navigator.clipboard.writeText(url).catch(() => {});
