@@ -1,6 +1,6 @@
 {
   "name": "poi-gis-tool",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "POI数据采集与GIS可视化工具",
   "author": "POI GIS Tool",
   "private": true,

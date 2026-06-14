@@ -16,30 +16,29 @@ function UpdatePrompt({ version, url, body, downloadUrl, onDismiss }: Props) {
   const [dlError, setDlError] = useState('');
   const [blobData, setBlobData] = useState<Uint8Array | null>(null);
 
-  // Build mirror URLs for GitHub assets
+  // Multiple CDN mirrors for GitHub assets — try in parallel, use fastest
   const getMirrorUrls = (originalUrl: string): string[] => {
-    // ghproxy.com — widely used GitHub mirror in China
     const urls = [originalUrl];
     try {
       const u = new URL(originalUrl);
-      urls.push(`https://ghproxy.com/${u.href}`);
+      // Common GitHub mirrors
+      urls.push(`https://ghproxy.net/${u.href}`);
+      urls.push(`https://gh-proxy.com/${u.href}`);
       urls.push(`https://mirror.ghproxy.com/${u.href}`);
     } catch { /* keep original only */ }
     return urls;
   };
 
-  const tryDownload = async (urls: string[]): Promise<Response> => {
-    let lastError: Error | null = null;
-    for (const url of urls) {
-      try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
-        if (res.ok) return res;
-        lastError = new Error(`HTTP ${res.status}`);
-      } catch (e: any) {
-        lastError = e;
-      }
+  const fetchOne = async (url: string, timeoutMs = 10000): Promise<Response | null> => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      return res.ok ? res : null;
+    } catch {
+      return null;
     }
-    throw lastError || new Error('所有下载源均不可用');
   };
 
   const handleDownload = async () => {
@@ -50,7 +49,8 @@ function UpdatePrompt({ version, url, body, downloadUrl, onDismiss }: Props) {
 
     try {
       const urls = getMirrorUrls(downloadUrl);
-      const res = await tryDownload(urls);
+      const res = await Promise.any(urls.map(u => fetchOne(u)));
+      if (!res) throw new Error('所有镜像源均无法连接');
       const total = Number(res.headers.get('content-length')) || 0;
       const reader = res.body?.getReader();
       if (!reader) throw new Error('无法读取响应流');

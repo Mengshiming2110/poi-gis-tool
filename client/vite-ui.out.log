@@ -323,3 +323,7 @@
 [2m13:13:58[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
 [2m13:13:58[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx[22m
 [2m13:14:15[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/mobile/MobileApp.tsx[22m
+[2m13:15:18[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mandroid/build/reports/problems/problems-report.html[22m
+[2m13:25:48[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/UpdatePrompt.tsx[22m
+[2m13:26:08[22m [36m[1m[vite][22m[39m changed tsconfig file detected: C:\Users\70715\Desktop\poi-gis-tool\client\tsconfig.json - Clearing cache and forcing full-reload to ensure TypeScript is compiled with updated config values.
+[2m13:26:25[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DesktopApp.tsx, /src/components/mobile/MobileApp.tsx[22m
