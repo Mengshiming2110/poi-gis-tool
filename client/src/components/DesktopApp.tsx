@@ -1023,7 +1023,7 @@ function DesktopApp() {
           boxShadow: '0 2px 12px rgba(0,0,0,0.12)', pointerEvents: 'none',
         }}>{toast.msg}</div>
       )}
-      {updateInfo && (
+      {updateInfo?.available && (
         <UpdatePrompt version={updateInfo.version} url={updateInfo.url} body={updateInfo.body} downloadUrl={updateInfo.downloadUrl} onDismiss={() => setUpdateInfo(null)} />
       )}
     </div>

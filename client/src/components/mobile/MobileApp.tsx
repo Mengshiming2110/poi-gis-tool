@@ -338,7 +338,7 @@ function MobileApp() {
 
       <MobileSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
-      {updateInfo && (
+      {updateInfo?.available && (
         <UpdatePrompt
           version={updateInfo.version}
           url={updateInfo.url}
