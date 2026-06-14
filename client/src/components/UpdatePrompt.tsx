@@ -158,13 +158,29 @@ function UpdatePrompt({ version, url, body, downloadUrl, onDismiss }: Props) {
 
         {/* Error state */}
         {dlState === 'error' && (
-          <div style={{ marginBottom: 14, fontSize: 13, color: '#dc2626' }}>
-            下载失败：{dlError}
-            <div style={{ marginTop: 6, fontSize: 12 }}>
-              <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6' }}>
-                前往 GitHub Releases 手动下载 →
-              </a>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 8 }}>
+              软件内下载失败：{dlError}
             </div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+              GitHub 服务器在国内可能不稳定，请通过浏览器手动下载安装包。
+            </div>
+            <a href={url} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'block', textAlign: 'center', padding: '10px 0', borderRadius: 8,
+                background: '#3b82f6', color: '#fff', fontSize: 14, fontWeight: 600,
+                textDecoration: 'none', marginBottom: 6 }}>
+              打开 GitHub Releases 页面下载
+            </a>
+            <button onClick={() => {
+              navigator.clipboard.writeText(url).catch(() => {});
+              const btn = document.activeElement as HTMLElement;
+              if (btn) { const t = btn.textContent; btn.textContent = '✓ 已复制'; setTimeout(() => { btn.textContent = t; }, 1500); }
+            }} style={{
+              width: '100%', padding: '8px 0', borderRadius: 8, border: '1px solid #e2e8f0',
+              background: '#fff', fontSize: 12, cursor: 'pointer', color: '#64748b',
+            }}>
+              📋 复制下载链接
+            </button>
           </div>
         )}
 
