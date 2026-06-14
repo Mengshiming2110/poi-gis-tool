@@ -225,14 +225,31 @@ function DesktopApp() {
     setToast({ msg, type }); setTimeout(() => setToast(null), 2500);
   }, []);
 
+  const [updateDot, setUpdateDot] = useState(false);
+
   const doCheckUpdate = useCallback(async () => {
     const info = await checkForUpdate();
     if (info.available) {
       setUpdateInfo(info);
+      localStorage.setItem('latest_known_version', info.version);
+      setUpdateDot(true);
     } else if (info.error) {
       setUpdateInfo(info);
     }
     return info;
+  }, []);
+
+  // Persist red dot: compare stored latest version with current
+  useEffect(() => {
+    const latest = localStorage.getItem('latest_known_version');
+    if (latest) {
+      const lp = latest.replace(/^v/, '').split('.').map(Number);
+      const cp = CURRENT_VERSION.replace(/^v/, '').split('.').map(Number);
+      for (let i = 0; i < Math.max(lp.length, cp.length); i++) {
+        if ((lp[i] || 0) > (cp[i] || 0)) { setUpdateDot(true); return; }
+        if ((lp[i] || 0) < (cp[i] || 0)) { setUpdateDot(false); localStorage.removeItem('latest_known_version'); return; }
+      }
+    }
   }, []);
 
   // Periodic auto-check every 30 minutes
@@ -976,7 +993,7 @@ function DesktopApp() {
             className={`desktop-nav-item ${view === item.id ? 'active' : ''}`}
             onClick={() => setView(item.id)}>
             {item.label}
-            {item.id === 'settings' && updateInfo?.available && (
+            {item.id === 'settings' && updateDot && (
               <span style={{ marginLeft: 6, width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
             )}
           </button>
