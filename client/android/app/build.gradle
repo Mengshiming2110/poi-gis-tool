@@ -7,8 +7,8 @@ android {
         applicationId "com.poi.gis.tool"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 265
+        versionName "2.6.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -20,6 +20,21 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+tasks.whenTaskAdded { task ->
+    if (task.name == 'assembleDebug' || task.name == 'assembleRelease') {
+        task.doLast {
+            def buildDir = new File("${project.buildDir}/outputs/apk/${task.name.contains('Release') ? 'release' : 'debug'}")
+            buildDir.eachFile { file ->
+                if (file.name.endsWith('.apk')) {
+                    def newName = "poi-gis-tool-v${android.defaultConfig.versionName}-${task.name.contains('Release') ? 'release' : 'debug'}.apk"
+                    def dest = new File(file.parent, newName)
+                    file.renameTo(dest)
+                }
+            }
         }
     }
 }
