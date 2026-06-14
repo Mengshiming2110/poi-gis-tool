@@ -900,6 +900,12 @@ function DesktopApp() {
                 }}>
                 {apiSaved ? <><Check size={14} weight="bold" style={{verticalAlign:-2}} /> 已保存</> : '保存 API 设置'}
               </button>
+              {apiSaved && (
+                <button className="desktop-btn primary" style={{ width: '100%', justifyContent: 'center', padding: '7px 0', marginTop: 6, fontSize: 13, fontWeight: 600, background: '#16a34a' }}
+                  onClick={() => window.location.reload()}>
+                  🔄 刷新页面使 Key 生效
+                </button>
+              )}
             </>
           );
         })()}

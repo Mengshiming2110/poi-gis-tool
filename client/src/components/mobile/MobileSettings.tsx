@@ -171,6 +171,16 @@ function MobileSettings({ open, onClose }: Props) {
           {saved ? '✅ 已保存' : '保存设置'}
         </button>
 
+        {saved && (
+          <button
+            className="mobile-btn primary"
+            style={{ width: '100%', marginTop: 8, background: '#16a34a' }}
+            onClick={() => window.location.reload()}
+          >
+            🔄 刷新页面使 Key 生效
+          </button>
+        )}
+
         <div style={{ marginTop: 12, fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
           采集使用 Web服务 Key，地图显示使用 JS API Key。<br />
           去 <a href="https://console.amap.com/dev/key/app" target="_blank" style={{ color: '#3b82f6' }}>高德开放平台</a> 申请
