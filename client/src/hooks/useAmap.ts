@@ -615,6 +615,55 @@ export function useAmap(containerId: string) {
     let done = 0;
     let firstError: string | null = null;
 
+    // Debug mode: generate mock POIs
+    if (localStorage.getItem('amap_debug_mode') === 'true') {
+      setIsCollecting(true);
+      collectingRef.current = true;
+      setPoiData([]);
+      const allPois: any[] = [];
+      const seen = new Set<string>();
+      const mockNames: Record<string, string[]> = {
+        '050000': ['川西坝子火锅','蜀九香','小龙坎','海底捞','大龙燚','老码头','巴蜀大将','谭鸭血','吼堂老火锅','锦城印象'],
+        '060000': ['红旗连锁','舞东风','全家便利店','屈臣氏','伊藤洋华堂','万象城','来福士','银泰城','凯德广场','王府井百货'],
+        '070000': ['U＋美容美发','郑远元修脚','顺丰快递站','菜鸟驿站','链家地产','58到家','洁丰干洗','快剪','天鹅到家','伊诚地产'],
+        '100000': ['锦江宾馆','希尔顿酒店','全季酒店','如家快捷','汉庭酒店','亚朵酒店','万豪酒店','洲际酒店','丽思卡尔顿','凯宾斯基'],
+        '110000': ['宽窄巷子','锦里古街','武侯祠','杜甫草堂','大熊猫基地','金沙遗址','文殊院','青羊宫','都江堰','青城山'],
+        '080000': ['华西医院','省人民医院','爱尔眼科','美年大健康','同仁堂','德仁堂','极光口腔','瑞慈体检','成飞医院','市一医院'],
+      };
+      const districts = ['锦江区','武侯区','青羊区','金牛区','成华区','高新区'];
+      let done = 0;
+      const totalTasks = cells.length * categories.length;
+      for (const cell of cells) {
+        if (!collectingRef.current) break;
+        for (const catCode of categories) {
+          if (!collectingRef.current) break;
+          const names = mockNames[catCode] || ['测试商户'];
+          const count = 5 + Math.floor(Math.random() * 15);
+          for (let i = 0; i < count; i++) {
+            const name = names[Math.floor(Math.random() * names.length)] + (i > 0 ? (['','旗舰店','分店'][Math.floor(Math.random()*3)]) : '');
+            const lng = cell.center[0] + (Math.random() - 0.5) * 0.01;
+            const lat = cell.center[1] + (Math.random() - 0.5) * 0.008;
+            const key = `${name}_${lng.toFixed(5)}_${lat.toFixed(5)}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              allPois.push({
+                id: `mock-${allPois.length}`, name, category: catCode,
+                subcategory: '', address: `四川省成都市${districts[Math.floor(Math.random()*districts.length)]}${['天府大道','红星路','人民南路','一环路','二环路','科华北路'][Math.floor(Math.random()*6)]}${Math.floor(Math.random()*200)}号`,
+                lng, lat, phone: Math.random() > 0.3 ? `1${[38,58,82,86,89][Math.floor(Math.random()*5)]}${String(Math.floor(Math.random()*100000000)).padStart(8,'0')}` : '',
+              });
+            }
+          }
+          done++;
+          onCellProgress(done, totalTasks, allPois.length);
+          await new Promise(r => setTimeout(r, 200));
+        }
+      }
+      setPoiData(allPois);
+      setIsCollecting(false);
+      collectingRef.current = false;
+      return allPois;
+    }
+
     if (!REST_KEY) {
       setPoiData([]);
       setIsCollecting(false);

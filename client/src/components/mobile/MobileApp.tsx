@@ -46,6 +46,7 @@ function MobileApp() {
   const [locating, setLocating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const amap = useAmap('mobile-map');
 
@@ -272,7 +273,7 @@ function MobileApp() {
               </label>
               <label className="set-field">
                 <span>API KEY (JS API)</span>
-                <input value={localStorage.getItem('amap_js_key') || ''} placeholder="输入高德 JS API Key" readOnly />
+                <input type="password" value={localStorage.getItem('amap_js_key') || ''} placeholder="输入高德 JS API Key" readOnly />
               </label>
               <button className="mobile-btn primary" onClick={() => setSettingsOpen(true)}>打开 API 设置</button>
             </div>
@@ -287,7 +288,7 @@ function MobileApp() {
                 const v = localStorage.getItem('amap_debug_mode');
                 localStorage.setItem('amap_debug_mode', v === 'true' ? 'false' : 'true');
               }}>
-                <span>🔧 调试模式（模拟POI）</span>
+                <span>调试模式（模拟POI）</span>
                 <b className={`switch ${localStorage.getItem('amap_debug_mode') === 'true' ? 'on' : ''}`} />
               </div>
             </div>
@@ -301,13 +302,17 @@ function MobileApp() {
               </div>
               <button
                 className="mobile-btn"
-                onClick={() => checkForUpdate().then((info) => {
+                disabled={checkingUpdate}
+                onClick={async () => {
+                  setCheckingUpdate(true);
+                  const info = await checkForUpdate();
                   if (info.available) setUpdateInfo(info);
                   else if (info.error) setUpdateInfo({ ...info });
                   else setUpdateInfo(null);
-                })}
+                  setCheckingUpdate(false);
+                }}
               >
-                检查更新
+                {checkingUpdate ? '检查中...' : '检查更新'}
               </button>
               {updateInfo?.error && (
                 <a href={RELEASES_URL} target="_blank" rel="noopener noreferrer"
