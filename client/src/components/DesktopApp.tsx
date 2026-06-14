@@ -3,7 +3,7 @@ import MapView from './MapView';
 import UpdatePrompt from './UpdatePrompt';
 import { useCollection } from '../hooks/useCollection';
 import { useSSE } from '../hooks/useSSE';
-import { getExportUrl, queryPoiLibrary, queryPois } from '../services/api';
+import { getExportUrl, queryPoiLibrary, queryPoiLibraryStats, queryPois, type PoiLibraryStats } from '../services/api';
 import { createCloudTask, insertCloudPois } from '../services/supabase';
 import { checkForUpdate, CURRENT_VERSION, RELEASES_URL, type UpdateInfo } from '../services/updater';
 import { CATEGORY_LIST, type PoiRecord } from '../types/poi';
@@ -34,40 +34,6 @@ function uniqueDuplicateKeys(pois: PoiRecord[]): Set<string> {
     if (!key || key === '_') return;
     if (seen.has(key)) duplicates.add(poiKey(p));
     else seen.add(key);
-  });
-  return duplicates;
-}
-
-function parseAddressScope(address?: string | null): { province: string; city: string; district: string; town: string } {
-  const text = address || '';
-  const province = text.match(/([^省]+省|[^市]+市|[^区]+自治区)/)?.[0] || '未知省份';
-  const city = text.match(/([^省市]+市|[^州]+州|[^盟]+盟)/)?.[0] || '未知城市';
-  const district = text.match(/([^市区县]+区|[^市区县]+县|[^市区县]+市)/)?.[0] || '未知区县';
-  const town = text.match(/([^区县镇乡街道]+镇|[^区县镇乡街道]+乡|[^区县镇乡街道]+街道)/)?.[0] || '未知镇乡';
-  return { province, city, district, town };
-}
-
-function buildAreaStats(pois: PoiRecord[]) {
-  const map = new Map<string, { name: string; total: number; categories: Record<string, number>; scope: ReturnType<typeof parseAddressScope> }>();
-  pois.forEach((p) => {
-    const scope = parseAddressScope(p.address);
-    const name = scope.district === '未知区县' ? '区域 A — 当前圈选' : `区域 A — ${scope.district}`;
-    const current = map.get(name) || { name, total: 0, categories: {}, scope };
-    current.total += 1;
-    current.categories[p.category || 'unknown'] = (current.categories[p.category || 'unknown'] || 0) + 1;
-    map.set(name, current);
-  });
-  return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 6);
-}
-
-function findDuplicatePois(pois: PoiRecord[]): PoiRecord[] {
-  const seen = new Map<string, PoiRecord>();
-  const duplicates: PoiRecord[] = [];
-  pois.forEach((p) => {
-    const key = `${p.name || ''}_${p.address || ''}`.trim();
-    if (!key || key === '_') return;
-    if (seen.has(key)) duplicates.push(p);
-    else seen.set(key, p);
   });
   return duplicates;
 }
@@ -171,6 +137,7 @@ function DesktopApp() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
   const [libraryPois, setLibraryPois] = useState<PoiRecord[]>([]);
   const [libraryTotal, setLibraryTotal] = useState(0);
+  const [libraryStats, setLibraryStats] = useState<PoiLibraryStats | null>(null);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [lastLibrarySync, setLastLibrarySync] = useState<string | null>(localStorage.getItem('poi_last_cloud_sync'));
 
@@ -280,9 +247,13 @@ function DesktopApp() {
   const loadPoiLibrary = useCallback(async () => {
     setLoadingLibrary(true);
     try {
-      const result = await queryPoiLibrary({ page: 1, pageSize: 500 });
+      const [result, stats] = await Promise.all([
+        queryPoiLibrary({ page: 1, pageSize: 500 }),
+        queryPoiLibraryStats(),
+      ]);
       setLibraryPois(result.pois);
       setLibraryTotal(result.total);
+      setLibraryStats(stats);
     } catch (e: any) {
       showToast(e?.message || '读取本地数据库失败', 'error');
     } finally {
@@ -681,9 +652,9 @@ function DesktopApp() {
   const renderDataManageProductView = () => {
     const sourcePois = libraryPois.length > 0 ? libraryPois : collectedPois;
     const sourceTotal = libraryTotal || sourcePois.length;
-    const areaStats = buildAreaStats(sourcePois);
-    const duplicates = findDuplicatePois(sourcePois);
+    const dbStats = libraryStats;
     const incrementalPois = collectedPois.length > 0 ? collectedPois : sourcePois;
+    const unsyncedCount = sourceTotal; // TODO: track sync_status per POI
     const lastSyncText = lastLibrarySync
       ? new Date(lastLibrarySync).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '-')
       : '尚未同步';
@@ -693,7 +664,7 @@ function DesktopApp() {
         <div className="data-manage-grid">
           <section className="data-card">
             <h3>云端上传</h3>
-            <p>将本地数据库中的采集数据上传至云端，支持全量和本次增量同步。</p>
+            <p>本地库共 <b>{sourceTotal}</b> 条，未同步 <b>{unsyncedCount}</b> 条。支持全量和本次增量同步。</p>
             <div className="data-action-row">
               <button className="desktop-btn primary" onClick={() => handleUpload(sourcePois)} disabled={sourcePois.length === 0 || syncStatus === 'syncing'}>
                 {syncStatus === 'syncing' ? '上传中...' : `上传全部 (${sourceTotal}条)`}
@@ -723,28 +694,24 @@ function DesktopApp() {
               <h3>按区域存储</h3>
               <button className="desktop-btn" onClick={loadPoiLibrary} disabled={loadingLibrary}>{loadingLibrary ? '刷新中...' : '刷新本地库'}</button>
             </div>
-            <p>采集数据写入本地数据库，并按地址中的省、市、区县、镇乡做轻量归类。</p>
+            <p>采集数据写入本地数据库，按区县自动归类。</p>
             <div className="area-store-list">
-              {areaStats.length > 0 ? areaStats.map((area) => (
-                <div key={area.name} className="area-store-card">
+              {dbStats && dbStats.byDistrict.length > 0 ? dbStats.byDistrict.map((d) => (
+                <div key={d.district} className="area-store-card">
                   <div className="area-store-title">
-                    <strong>{area.name}</strong>
-                    <span>{area.total} 条</span>
+                    <strong>{d.district}</strong>
+                    <span>{d.count} 条</span>
                   </div>
-                  <div className="area-store-scope">
-                    {area.scope.province} / {area.scope.city} / {area.scope.district} / {area.scope.town}
+                  <div className="area-store-scope">区县级采集区域</div>
+                  <div className="area-store-row">
+                    <span>占本地库</span>
+                    <b>{Math.round((d.count / Math.max(dbStats.total, 1)) * 100)}%</b>
                   </div>
-                  {Object.entries(area.categories).slice(0, 4).map(([code, count]) => (
-                    <div key={code} className="area-store-row">
-                      <span>{catName(code)}</span>
-                      <b>{count}</b>
-                    </div>
-                  ))}
                 </div>
               )) : (
                 <div className="desktop-empty-state compact">
                   <strong>本地数据库暂无数据</strong>
-                  <span>完成一次服务端采集后，数据会自动写入这里。</span>
+                  <span>完成一次服务端采集后，数据会自动写入这里并按区县归类。</span>
                 </div>
               )}
             </div>
@@ -753,17 +720,19 @@ function DesktopApp() {
           <section className="data-card data-card-tall">
             <h3>重复检测</h3>
             <p>采集前后对比同名同地址商户，减少重复入库和重复上传。</p>
-            <div className="duplicate-summary">最近检测到 {duplicates.length} 条重复记录</div>
+            <div className="duplicate-summary">
+              本地库共 {dbStats?.total || sourcePois.length} 条，检测到 {dbStats?.duplicateCount || 0} 条重复记录
+            </div>
             <div className="duplicate-list">
-              {duplicates.length > 0 ? duplicates.slice(0, 8).map((p) => (
-                <button key={poiKey(p)} className="duplicate-item" onClick={() => { setSelectedPoi(p); setView('detail'); }}>
-                  <span>{p.name}</span>
-                  <em>已存在于本地库</em>
-                </button>
-              )) : (
+              {dbStats && dbStats.duplicateCount > 0 ? (
+                <div className="desktop-empty-state compact">
+                  <strong>{dbStats.duplicateCount} 条重复</strong>
+                  <span>同名同地址的 POI 已标记，可在商户详情中处理。</span>
+                </div>
+              ) : (
                 <div className="desktop-empty-state compact">
                   <strong>暂无重复记录</strong>
-                  <span>{sourcePois.length > 0 ? '当前本地库未发现同名同地址重复。' : '暂无数据可检测。'}</span>
+                  <span>{dbStats ? '本地库未发现同名同地址重复。' : sourcePois.length > 0 ? '正在加载统计...' : '暂无数据可检测。'}</span>
                 </div>
               )}
             </div>

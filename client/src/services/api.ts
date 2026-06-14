@@ -79,6 +79,19 @@ export async function queryPoiLibrary(params: {
   return res.json();
 }
 
+export interface PoiLibraryStats {
+  total: number;
+  byDistrict: { district: string; count: number }[];
+  byCategory: { category: string; count: number }[];
+  duplicateCount: number;
+}
+
+export async function queryPoiLibraryStats(): Promise<PoiLibraryStats> {
+  const res = await fetch(`${BASE}/pois/library/stats`);
+  if (!res.ok) throw new Error('获取本地库统计失败');
+  return res.json();
+}
+
 export function getExportUrl(taskId: string, format: 'xlsx' | 'geojson'): string {
   return `${BASE}/export/${taskId}?format=${format}`;
 }

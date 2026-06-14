@@ -211,6 +211,37 @@ export function queryPoiLibrary(params: {
   return { pois, total };
 }
 
+export function queryPoiLibraryStats(): {
+  total: number;
+  byDistrict: { district: string; count: number }[];
+  byCategory: { category: string; count: number }[];
+  duplicateCount: number;
+} {
+  const totalRow = db.exec('SELECT COUNT(*) as c FROM pois')[0]?.values[0];
+  const total = totalRow ? Number(totalRow[0]) : 0;
+
+  const byDistrict: { district: string; count: number }[] = [];
+  const districtStmt = db.prepare('SELECT COALESCE(NULLIF(district, \'\'), \'未知区县\') as d, COUNT(*) as c FROM pois GROUP BY d ORDER BY c DESC');
+  while (districtStmt.step()) {
+    const row = districtStmt.getAsObject();
+    byDistrict.push({ district: String(row.d || ''), count: Number(row.c) });
+  }
+  districtStmt.free();
+
+  const byCategory: { category: string; count: number }[] = [];
+  const catStmt = db.prepare('SELECT COALESCE(NULLIF(category, \'\'), \'未分类\') as cat, COUNT(*) as c FROM pois GROUP BY cat ORDER BY c DESC');
+  while (catStmt.step()) {
+    const row = catStmt.getAsObject();
+    byCategory.push({ category: String(row.cat || ''), count: Number(row.c) });
+  }
+  catStmt.free();
+
+  const dupRow = db.exec('SELECT COUNT(*) as c FROM (SELECT name, address, COUNT(*) as cnt FROM pois GROUP BY name, address HAVING cnt > 1)')[0]?.values[0];
+  const duplicateCount = dupRow ? Number(dupRow[0]) : 0;
+
+  return { total, byDistrict, byCategory, duplicateCount };
+}
+
 export function getTaskPoisForExport(taskId: string): PoiRecord[] {
   const pois: PoiRecord[] = [];
   const stmt = db.prepare('SELECT * FROM pois WHERE task_id = ? ORDER BY id');

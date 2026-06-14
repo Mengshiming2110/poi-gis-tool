@@ -1,7 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { queryPoiLibrary, queryPois } from '../db';
+import { queryPoiLibrary, queryPois, queryPoiLibraryStats } from '../db';
 
 const router = Router();
+
+router.get('/library/stats', (_req: Request, res: Response) => {
+  const stats = queryPoiLibraryStats();
+  res.json(stats);
+});
 
 router.get('/library', (req: Request, res: Response) => {
   const { page = '1', pageSize = '200', search, category } = req.query;
