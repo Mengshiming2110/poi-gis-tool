@@ -1,7 +1,7 @@
 # POI GIS 商户信息采集工具 — 设计文档
 
-> 版本：v2.2.0  
-> 日期：2026-06-13  
+> 版本：v2.6.3
+> 日期：2026-06-14
 > 方向：modern-minimal（Linear / Vercel 风格）
 
 ---
@@ -10,327 +10,255 @@
 
 ### 1.1 定位
 
-面向菜品配送公司员工的信息采集工具。运营人员在高德地图上划定目标区域，勾选 POI 分类（餐饮、零售、生活服务等），通过高德开放平台 API 批量拉取区域内公开 POI 数据，实时查看采集进度，并将数据按区域存储、导出 Excel、上传云端。
+面向配送公司运营人员的 POI 数据采集与 GIS 可视化工具。在高德地图上划定目标区域，勾选 POI 分类，通过高德 API 批量拉取公开商户数据，实时查看进度，数据写入本地 SQLite 数据库，支持云端同步（Supabase）、多维度统计和按区县导出。
 
 ### 1.2 核心流程
 
 ```
-划定区域 → 配置 POI 类型 → 调用高德 API 拉取 → 进度追踪 → 数据浏览 → 导出/上传
+划定区域 → 配置 POI 类型 → 调用高德 API → 进度追踪
+                                              ↓
+              数据浏览 ← 数据管理 ← 本地 SQLite 入库 ←┘
+                 ↓
+          地图标记 / 导出 Excel/GeoJSON / 云端同步
 ```
 
 ### 1.3 用户角色
 
-- **配送公司运营人员**：在办公室桌面端操作，负责划定区域、执行数据采集、导出数据
-- **偶尔户外平板使用**：快速查看已采集数据、检查采集进度
+- **运营人员（桌面端）**：划定区域、执行采集、数据管理、导出
+- **外勤人员（手机端）**：快速采集、查看数据、同步云端
 
 ---
 
 ## 二、架构设计
 
-### 2.1 信息架构
+### 2.1 整体架构
 
 ```
-POI GIS 采集工具
-├── 区域 & 类型配置      ← 地图圈选 + POI 分类 + API 预览 + 开始拉取
-├── 拉取进度             ← 统计卡片 + 实时日志表格
-├── 数据浏览             ← 搜索筛选 + 商户详情
-├── 导出 & 上传          ← 云端上传 + Excel/CSV 导出 + 按区域存储 + 重复检测
-└── 系统设置             ← API Key + 拉取参数 + 版本管理
+┌─ client/ (React 18 + Vite) ──────────────────────┐
+│  DesktopApp.tsx  │  MobileApp.tsx                  │
+│  useAmap (地图)   │  useCollection (服务端采集)     │
+│  useSSE (进度)    │  supabase.ts (云同步)           │
+│  updater.ts (更新)│  api.ts (服务端通信)            │
+├─ server/ (Express + sql.js WASM SQLite) ──────────┤
+│  /api/collect   → 采集调度 (queue.ts)             │
+│  /api/pois      → POI 查询 / 统计 / 合并 / 标记    │
+│  /api/export    → Excel/GeoJSON 导出              │
+├─ electron/ (Electron 42) ────────────────────────┤
+│  main.js (Express 进程 + 窗口)                    │
+│  preload.js (IPC: 文件保存 + 安装)                │
+├─ shared/ (Supabase 云同步) ──────────────────────┤
+│  桌面 ←→ Supabase ←→ 手机                         │
+└──────────────────────────────────────────────────┘
 ```
 
 ### 2.2 双端策略
 
-| 维度 | 桌面版 (`index.html`) | 手机版 (`mobile.html`) |
-|------|----------------------|------------------------|
-| 导航 | 左侧固定侧边栏 (220px) | 底部 Tab 栏 (4 个 Tab) |
-| 布局 | 地图 + 右侧配置面板分屏 | 地图全屏 + 底部 Sheet |
-| 表格 | HTML table + 7 列 | 卡片列表 + 横向滚动 |
-| 详情 | 左右分栏 (列表 + 详情) | 卡片点击 → 全屏滑入 |
-| 交互 | 鼠标悬停、点击 | 44px 触摸目标、滑动 |
+| 维度 | 桌面版 | 手机版 |
+|------|--------|--------|
+| 导航 | 左侧固定侧边栏 220px (6 视图) | 底部 Tab (4 标签) |
+| 地图 | 右侧配置面板内嵌 | 全屏 + 底部 Sheet |
+| 采集 | 服务端 Express 调度 | 客户端直调 REST API |
+| 数据 | 本地 SQLite 数据库 | 内存 + localStorage 缓存 |
+| 交互 | 鼠标 + Phosphor 图标 | 触摸 44px 目标 |
 
 ---
 
 ## 三、视觉系统
 
-### 3.1 方向：modern-minimal
-
-参考 Linear、Vercel、Notion 2024、Stripe docs。安静、精准、软件原生。系统字体，近乎灰度配色，单一高饱和 accent。装饰消失，内容本身是唯一焦点。
-
-### 3.2 色彩标记
+### 3.1 色彩 (oklch)
 
 ```css
---bg:      oklch(99% 0.002 240);   /* 页面底色 */
---surface: oklch(100% 0 0);        /* 卡片/面板底色 */
---fg:      oklch(18% 0.012 250);   /* 正文色 */
---muted:   oklch(54% 0.012 250);   /* 辅助文本 */
---border:  oklch(92% 0.005 250);   /* hairline 边框 */
---accent:  oklch(58% 0.18 255);    /* 单一 accent 蓝 */
+:root {
+  --bg:      oklch(99% 0.002 240);
+  --surface: oklch(100% 0 0);
+  --fg:      oklch(18% 0.012 250);
+  --muted:   oklch(54% 0.012 250);
+  --border:  oklch(92% 0.005 250);
+  --accent:  oklch(58% 0.18 255);
+  --success: oklch(58% 0.15 145);
+  --warn:    oklch(58% 0.16 35);
+}
+.dark {
+  --bg:      oklch(14% 0.008 250);
+  --surface: oklch(18% 0.006 250);
+  --fg:      oklch(92% 0.004 250);
+  --accent:  oklch(64% 0.18 255);
+}
 ```
 
-暗色模式：
+### 3.2 图标系统
 
-```css
---bg:      oklch(14% 0.008 250);
---surface: oklch(18% 0.006 250);
---fg:      oklch(92% 0.004 250);
---muted:   oklch(62% 0.012 250);
---border:  oklch(26% 0.008 240);
---accent:  oklch(64% 0.18 255);
-```
-
-### 3.3 色彩使用规则
-
-- accent 仅用于：关键 CTA 按钮、选中态、活跃链接、进度指示器
-- 每屏 accent 出现不超过 2 次
-- 已采集状态使用 `oklch(58% 0.15 145)` 绿色
-- 重复警告使用 `oklch(58% 0.16 35)` 暖色
-- `:root` 无渐变、无阴影（除 dropdown/modal）
-
-### 3.4 字体栈
-
-```css
---font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
---font-body:    -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
---font-mono:    'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
-```
-
-- display + body 使用同一系统字体族（modern-minimal 例外允许）
-- mono 用于：API URL、坐标、版本号、数据 ID、时间戳
-- display 字号上紧 letter-spacing (-0.02em)
-- 正文 line-height 1.5，font-size 14px
-
-### 3.5 形状与空间
-
-- 圆角：`--radius: 8px`（卡片）、`--radius-sm: 4px`（按钮/输入框）
-- 边框：hairline 1px solid，无阴影（地图 marker 除外）
-- 间距：16px 基础单位，20px 大间距，12px 小间距
-- 侧边栏宽：220px
-- 底部状态栏高：36px
-- 顶栏高：48px
+全局使用 Phosphor Icons，无 Unicode emoji。
+按钮图标：Play/Pause/Stop/X/Square/Polygon/Circle/PushPin
+导航图标：Cloud/DownloadSimple/ChartBar/ArrowsClockwise/Key/Gear
+状态图标：Check/CheckCircle/Moon/Sun/Hourglass/Warning
 
 ---
 
-## 四、视图详细设计
+## 四、桌面端视图
 
-### 4.1 区域 & 类型配置（主视图）
+### 4.1 地图工作台
 
-**目的**：一站式完成区域圈选和 POI 类型配置，直接发起 API 拉取。
+左侧地图 + 右侧配置面板 (220px sidebar + 300px panel)。
 
-**布局**：`flex-direction: row`，左侧地图 flex:1，右侧配置面板 300px。
+- **绘制工具**：矩形/多边形/圆形（两点点击+实时预览）+ 标注点 (PushPin)
+  - 进入绘制 → 十字光标 + 蓝色提示框
+  - 第一点 → 脉冲锚点 + 鼠标移动实时预览半透明形状
+  - 第二点 → 图形保留 + 自动退出 + 绿色确认
+  - Esc → 取消，退出绘制模式
+- **POI 分类**：13 个 Chip 按钮（餐饮/购物/生活服务...），2 列网格
+- **网格精度**：Slider (100-2000m) + 预设按钮 (500/1000/1500m) + 切分按钮
+- **预估**：已选 X 类 · Y 格 · 预估请求次数
+- **开始采集**：调用服务端 API，传 amapKey + skipDuplicates + debug
 
-**左侧 — 地图区域**：
-- CSS grid 模拟地图背景（40px 网格）
-- 横纵道路线模拟城市路网
-- 道路标签（南三环、科华路、天府大道等）
-- 10 个 POI marker 散点（蓝 = 待采集，绿 = 已采集）
-- 虚线矩形框 + 浮动标签 = 当前采集区域
-- 左上角工具按钮：矩形圈选 / 多边形圈选 / 测距
-- 右上角地图控件：放大(+) / 缩小(−) / 复位(⟐)
-- 左下角图例：显示 marker 颜色含义
+### 4.2 采集进度
 
-**右侧 — 配置面板**：
-- POI 分类网格（2 列 chips）：050000 餐饮、060000 购物、070000 生活服务、080000 住宿、100000 休闲娱乐、120000 医疗保健
-- 目标区域下拉框：区域 A/B/C
-- 实时汇总："选中区域 **76** 个 POI · 6 个分类 · 预计 4 次请求"
-- API URL 预览（monospace 显示 polygon 接口）
-- accent 色 "开始拉取 POI 数据" 按钮
+环形进度图 + 4 统计卡片 + 进度表格。
 
-**交互**：
-- 点击分类 chip → toggle 选中 → 汇总数字自动更新
-- 切换区域下拉 → 汇总重新计算
-- 点击 marker → 跳转到数据浏览详情
-- 点击 "开始拉取" → 弹窗确认 → 模拟拉取过程
+- 统计卡：总数 / 已采集% / 待采集 / 重复项
+- 环形图 conic-gradient 按百分比填充
+- 区域进度条 + 分类明细
+- 表格列：名称/类型/区域/地址/状态/采集时间，重复项橙色标记
+- 控制按钮：暂停/继续/取消（仅在运行中/暂停时显示）
 
-### 4.2 拉取进度
+### 4.3 商户详情
 
-**目的**：实时展示 API 请求进度和数据入库统计。
+左侧可搜索筛选列表 + 右侧详情卡片。
 
-**布局**：纵向单列，4 统计卡片 + 进度日志表格。
+- 左侧：搜索框 + 分类 Chip 筛选（中文名+色块）
+- 右侧：分类 badge + 名称 + 地址/电话/坐标/采集时间
+- 操作：拨打电话 / 在地图中查看(flyTo) / 标记重复(toggle)
+- 标记重复持久化到 manualDuplicateKeys Set
 
-**统计卡片**（flex row，等宽）：
-- API 请求次数：4（已完成）
-- 获取 POI 数：76（6 个分类）
-- 新增入库：71（94.7% 有效率）
-- 跳过重复：4（已存在于其他区域）
+### 4.4 数据管理
 
-**日志表格**（7 列）：
-- 请求 #、区域、分类、获取数、新增、重复、状态(✓)、耗时
+顶部统计栏 + 左右双栏布局。
 
-### 4.3 数据浏览
+```
+统计栏: [本地库 N] [已同步 N] [待上传 N] [重复 N]
+左栏: ☁ 云同步 (上传全部/增量 + 从云端拉取合并)
+      📥 数据导出 (Excel/CSV/GeoJSON)
+右栏: 📊 按区域存储 (区县分组 + 点击钻取表格 + 按区域导出)
+      🔄 重复检测 (DB 统计)
+```
 
-**目的**：搜索、筛选、查看已采集商户的完整信息。
-
-**布局**：左侧筛选面板 320px + 右侧详情区域 flex:1。
-
-**筛选面板**：
-- 搜索框（支持名称/地址实时过滤）
-- 分类 chips：全部 / 餐饮 / 购物 / 生活服务
-- 区域 chips：区域 A / B / C
-- 结果计数 + 商户列表
-
-**详情面板**：
-- 分类 badge + 商户名称 H2
-- 字段网格（2 列）：地址、POI ID（mono）、电话、坐标（mono）
-- 地图缩略图占位（160px 网格纹理）
-- 操作按钮：拨打电话 / 在地图中查看 / 标记重复
-
-**空态**："← 选择左侧商户查看详情"
-
-### 4.4 导出 & 上传
-
-**目的**：数据管理和分发。
-
-**布局**：2 列网格（响应式退化为单列）。
-
-**4 个卡片**：
-1. ☁ 云端上传 — 全量上传/增量上传按钮 + 上次同步时间
-2. 📥 数据导出 — Excel/CSV/按区域导出按钮
-3. 📊 按区域存储 — 3 个可折叠区域组，每组显示分类明细表格
-4. 🔄 重复检测 — 按高德 POI ID 自动判重，3 条重复记录卡片
+- **本地库统计**：服务端 `/api/pois/library/stats` 返回 total/byDistrict/byCategory/unsynced/synced/dupCount
+- **上传**：`handleUpload(pois)` → Supabase → 成功后 `markPoisSynced(ids)`
+- **从云端拉取**：`getTasks()` + `getPois(taskId)` → `POST /api/pois/merge` → INSERT 去重
+- **区域钻取**：点击区县 → `queryPoiLibrary({district})` → 表格 + 导出按钮
+- **重复检测**：`queryPoiLibraryStats().duplicateCount` (SQL GROUP BY name,address)
 
 ### 4.5 系统设置
 
-**目的**：配置 API 密钥、拉取行为、查看版本历史。
-
-**3 个设置节**（max-width 680px，卡片堆叠）：
-
-1. **🔑 高德开放平台 API**
-   - API Key (Web 服务) — 密码输入框
-   - API Key (JS API) — 文本输入框
-   - 使用代理转发 — toggle
-
-2. **⚙ 拉取参数**
-   - POI 类型范围 — select
-   - 搜索半径 — range slider (100-5000m)
-   - 单次请求上限 — number input (1-50)
-   - 请求间隔 — number input (100-2000ms)
-   - 自动跳过重复项 — toggle
-   - 拉取完成后自动上传 — toggle
-
-3. **📋 版本管理**
-   - 当前版本号（大号 28px）
-   - 更新状态（已是最新版 / 发现新版本）
-   - 检查更新按钮
-   - 上次检查时间
-   - 自动检查 toggle
-   - 版本日志列表（ver + desc + date，4 条记录）
+- **API Key**：Web服务/JS API/安全密钥，三个 password 输入框共用一个 [保存 API 设置] 按钮
+- **采集参数**：搜索半径 slider / 请求上限 / 请求间隔 / 调试模式 toggle
+- **版本管理**：当前版本号 + 检查更新按钮(loading 态 + toast 反馈)
+  - 新版本 → 弹窗下载 (4 镜像并行竞速 + 手动下载降级)
+  - 红点持久化 (localStorage latest_known_version，直到更新才消)
 
 ---
 
-## 五、响应式策略
+## 五、数据库设计
 
-### 5.1 桌面版断点
+### 5.1 SQLite (pois 表)
 
-| 断点 | 变更 |
-|------|------|
-| >960px | 全功能布局，侧边栏固定，配置面板 300px |
-| 861-960px | 配置面板缩窄至 260px |
-| ≤860px | 侧边栏变为 overlay + 遮罩，配置面板移到地图下方（上下布局），详情页列表变顶部栏，grid 退化为单列 |
-| ≤640px | 所有间距收缩，统计卡片 2 列, 表格横向滚动, 地图控件横排 |
-| ≤380px | 统计卡片退回单列 |
-
-### 5.2 手机版（独立文件 `mobile.html`）
-
-手机版采用完全不同的架构：
-- 底部固定 Tab 栏替代侧边栏
-- 地图全屏 + FAB 按钮呼出配置 Sheet
-- 数据以卡片列表展示，点击滑入详情
-- 进度按区域折叠卡片
-- 所有按钮 44px 最小触摸目标
-- 支持 safe-area-inset-bottom
-
----
-
-## 六、状态管理
-
-### 6.1 采集状态
-
-| 状态 | 标识 |
-|------|------|
-| 空闲 | 底部 status dot 灰色 |
-| 采集中 | 底部 status dot 蓝色（accent）|
-| API 正常 | 状态栏显示 "API: 正常" |
-| API 异常 | 状态栏显示 "API: 异常"（红色）|
-
-### 6.2 POI 条目状态
-
-| 状态 | 视觉 |
-|------|------|
-| 待采集（新）| 蓝色 tag（`tag-new`）|
-| 已采集 | 绿色 tag（`tag-done`）|
-| 重复 | 橙色警告条 |
-
-### 6.3 区域进度
-
-- 进度条 fill 百分比 = `(已采集数 / 总数) × 100%`
-- 环形图 stroke-dashoffset 动态调整
-
----
-
-## 七、技术实现
-
-### 7.1 文件结构
-
-```
-project/
-├── client/             ← React 18 + TypeScript + Vite 前端
-│   ├── src/
-│   │   ├── components/    ← DesktopApp / MobileApp + 子组件
-│   │   ├── hooks/         ← useAmap / useCollection / useSSE
-│   │   ├── services/      ← api.ts / supabase.ts / updater.ts
-│   │   └── types/         ← 共享类型定义
-│   └── android/           ← Capacitor Android 工程
-├── server/             ← Express + sql.js 采集后端
-│   └── src/
-│       ├── routes/        ← collection / pois / export
-│       └── services/      ← amap / grid / cloud
-├── electron/           ← Electron 桌面壳
-├── index.html          ← 桌面端 HTML 原型
-├── mobile.html         ← 移动端 HTML 原型
-└── DESIGN.md           ← 本文档
+```sql
+CREATE TABLE pois (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id      TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  category     TEXT,
+  subcategory  TEXT,
+  address      TEXT,
+  lng          REAL NOT NULL,
+  lat          REAL NOT NULL,
+  phone        TEXT,
+  rating       REAL,
+  province     TEXT,        -- 从地址解析
+  city         TEXT,
+  district     TEXT,
+  town         TEXT,
+  sync_status  TEXT DEFAULT 'pending',  -- pending|synced
+  collected_at TEXT DEFAULT (datetime('now'))
+);
 ```
 
-### 7.2 技术选型
+### 5.2 数据流
 
-- **React 18 + TypeScript + Vite**：组件化 UI，类型安全
-- **高德 JS API v2.0**：地图显示、MouseTool 圈选（CDN 加载）
-- **高德 REST API v3**：POI 搜索采集（`restapi.amap.com/v3/place/around`）
-- **Express + sql.js (WASM SQLite)**：服务端采集调度与数据存储
-- **Electron + electron-builder**：桌面端 `.exe` 打包
-- **Capacitor**：Android `.apk` 打包
-- **Supabase**：云端数据同步
-- **CSS 自定义属性 (oklch)**：全局 tokens + 暗色模式
+```
+采集 → queue.ts → parseAddress() → insertPois(province/city/district/town)
+                    ↓
+              SQLite pois 表
+                    ↓
+    queryPoiLibrary / queryPoiLibraryStats / mergeCloudPois
+                    ↓
+              数据管理页展示
+```
 
-### 7.3 模拟数据
+### 5.3 云端同步 (Supabase)
 
-所有数据为合理模拟值，包含：
-- 成都高新区/锦江区/青羊区的真实地名
-- 真实商户名称（川西坝子、蜀九香、红旗连锁等）
-- 高德 API 风格的 polygon 请求 URL
-- 真实的高德 POI 分类编码（050000、060000 等）
+```
+上传: handleUpload(pois) → createCloudTask → insertCloudPois
+                          → markPoisSynced(ids) → refresh stats
+
+下载: getTasks → getPois(taskId) → mergePoisToDb(mapped)
+      → POST /api/pois/merge → INSERT WHERE NOT EXISTS (去重)
+```
 
 ---
 
-## 八、设计决策记录
+## 六、更新机制
+
+- 启动时静默检测 + 每 30 分钟自动检测
+- 手动检查：loading 态 + toast (已最新/发现新版/连接失败)
+- 新版本检测 → 侧边栏设置旁红点 (持久化直到安装)
+- 下载：4 个镜像并行竞速 (ghfast.top / ghp.ci / ghproxy.net / moeyy.xyz)
+- 全部失败 → 引导手动下载 + kkgithub 镜像链接
+- Electron：IPC saveAndOpenInstaller (写入临时目录 → shell.openPath)
+
+---
+
+## 七、技术栈
+
+| 层 | 技术 |
+|----|------|
+| 前端 | React 18 + TypeScript + Vite |
+| UI 图标 | Phosphor Icons |
+| 地图 | 高德 JS API v2.0 (CDN 动态加载 key) |
+| POI 搜索 | 高德 REST API v3 (place/around) |
+| 服务端 | Express + sql.js (WASM SQLite) |
+| 桌面打包 | Electron 42 + electron-builder (NSIS) |
+| 移动打包 | Capacitor Android |
+| 云同步 | Supabase (tasks + pois 表) |
+| 更新 | GitHub Releases API + 多镜像下载 |
+| 样式 | CSS 自定义属性 (oklch) + 暗色模式 |
+
+---
+
+## 八、决策记录
 
 | 决策 | 理由 |
 |------|------|
-| 合并"区域圈选"和"POI 配置"为一个视图 | 用户反馈两个步骤频繁切换，整合后减少操作步数 |
-| 手机端独立做一版而非响应式适配 | 桌面端信息密度高（6 视图），手机端屏幕无法承载；底部 Tab 架构更适合触屏 |
-| 模拟地图而非接入真实高德 JS API | 原型阶段，CSS grid 地图 + marker 散点已足够表达交互逻辑 |
-| 版本管理加入检查更新功能 | 用户反馈原有版本日志缺少检测和更新入口 |
-| accent 色仅用于 CTA 和选中态 | modern-minimal 方向约束：单 accent + hairline 边框 + 无阴影 |
-| 地图右侧配置面板 vs 独立页面 | 同屏操作减少上下文切换，API URL 预览实时反映参数变化 |
+| 两点点击替代拖拽绘制 | 消除与地图平移的操作冲突 |
+| 本地 SQLite 作为主数据源 | 离线可用、多任务累计、跨任务查询 |
+| 服务端解析地址省市区 | SQL 统计快于前端临时计算 |
+| 云端增量同步 (sync_status) | 避免重复上传，减少 Supabase 请求 |
+| Phosphor 替代 emoji | 跨平台渲染一致，视觉更专业 |
+| 多镜像并行下载 | GitHub CDN 在国内不稳定 |
+| 红点持久化 | 用户不会因关闭弹窗而错过更新 |
+| 调试模式 (mock POI) | 不消耗 API 额度即可测试全流程 |
 
 ---
 
-## 九、未覆盖事项（后续迭代建议）
+## 九、版本历史
 
-- [ ] 接入真实高德 JS API 地图
-- [ ] 真实 API 请求与错误处理
-- [ ] 多区域并行拉取队列
-- [ ] 用户自定义 POI 分类组合保存
-- [ ] 采集历史回溯与回滚
-- [ ] 真实 Excel 导出（SheetJS）
-- [ ] 真实云端上传 API 对接
-- [ ] 登录/权限管理
+| 版本 | 日期 | 内容 |
+|------|------|------|
+| v2.6.3 | 06-14 | 更新红点持久化 |
+| v2.6.2 | 06-14 | 换用实测可用镜像站 |
+| v2.6.1 | 06-14 | 并行镜像竞速下载 |
+| v2.6.0 | 06-14 | Phosphor 图标替代 emoji |
+| v2.5.x | 06-14 | 本地库升级/增量同步/区域钻取/UI重构 |
+| v2.4.0 | 06-14 | 云端合并/数据管理页布局重构 |
+| v2.3.0 | 06-14 | Key 传递链路修复/ErrorBoundary/调试模式 |
+| v2.2.0 | 06-13 | 检查更新 + 底部Tab导航 |
